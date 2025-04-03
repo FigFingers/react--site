@@ -19,6 +19,7 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
     document.cookie = `username=${encodeURIComponent(username)}; path=/; max-age=3600; secure; samesite=lax`;
     document.cookie = `starttime=${encodeURIComponent(starttime)}; path=/; max-age=3600; secure`;
     document.cookie = `endtime=${encodeURIComponent(endtime)}; path=/; max-age=3600; secure`;
+    document.cookie = `url=${encodeURIComponent(url)}; path=/; max-age=3600; secure`;
     // Cookie設定確認用（必要なら削除）
     console.log("Cookie設定: ", document.cookie);    
     //カスタムイベント発火
@@ -29,10 +30,10 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
 
       //リンクを開く処理
       if (urlLink) {
+        //ここで拡張機能に、既に開いているnetflixタブがあるか確認してもらう その為の値を渡す
         console.log("open URL");
-        window.open(urlLink, "_blank");// 実際にリンクを開く処理（コメントアウト中）
+        window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");// 実際にリンクを開く処理　t=時間で再生可能時間を指定できる。
         console.log("open URL now");
-
       } else {
         alert("Invalid link or unknown service");//eroorリンクへの変更
       }

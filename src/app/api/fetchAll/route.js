@@ -3,14 +3,14 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     const clips = await prisma.clip.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
     });
 
-    return new Response(JSON.stringify(clips), {
+    return new Response(JSON.stringify({ allReceivedData: clips }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*', // CORS対応
+        'Access-Control-Allow-Origin': '*',
       },
     });
   } catch (error) {
@@ -21,6 +21,7 @@ export async function GET() {
     });
   }
 }
+
 
 // CORS対策（必要であれば）
 export function OPTIONS() {

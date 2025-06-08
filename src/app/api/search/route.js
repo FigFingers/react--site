@@ -36,7 +36,7 @@ export async function GET(req) {
 
     const results = [...exactMatch, ...sortedPartial].slice(0, 30);
 
-    return new Response(JSON.stringify(results), {
+    return new Response(JSON.stringify({ allReceivedData: results }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

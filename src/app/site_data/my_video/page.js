@@ -11,7 +11,7 @@ export default function app() {
 <Sidebar/>
 <div className="main-content">
 <HeadSearch/>
-<ClipList clipApiUrl="http://localhost:3000/api/search?q=BEASTARS&user=yabuki" />{/* 後ほどsearchでのuserID完全一致に書き換え */}
+<ClipList clipApiUrl="http://localhost:3000/api/search?user=yabuki" />{/* 後ほどsearchでのuserID完全一致に書き換え */}
 </div>
 </>
 );}

@@ -67,11 +67,11 @@ export default function ClipList({ clipApiUrl }) {
               name="切り抜き"
               title={item.title || "タイトルがありません"}
               epnum={item.epnumber || "エラー"}
-              url={item.URL || "/browse"}
+              url={item.url || "/browse"}
               username="ユーザー名"
               icon="netflix"
-              starttime={item.StartTime}
-              endtime={item.EndTime}
+              starttime={item.startTime}
+              endtime={item.endTime}
             />
           ))
         ) : (

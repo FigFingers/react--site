@@ -11,7 +11,7 @@ export default function app() {
 
 <div className="main-content">
   <HeadSearch/>
-  <ClipList clipApiUrl="http://localhost:3000/api/fetchAll" />
+  <ClipList clipApiUrl="/api/random10" />
   <PlayList PlayList_Data_Url="/test_data/mylist.json"/>
 </div>
 </>

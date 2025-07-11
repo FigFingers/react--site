@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
+export const dynamic = 'force-dynamic';
 
-export default function ClipPage({ params }) {
+export default async function ClipPage({ params }) {
   const id = params?.id;
 
   if (!id) return <h1>Missing ID</h1>;

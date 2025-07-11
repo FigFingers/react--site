@@ -1,5 +1,5 @@
 "use client";
-import HeadSearch from'@/app/base//base/headSearch/headSearch'; ; // ヘッダー
+import HeadSearch from'@/app/base/base/headSearch/headSearch'; // ヘッダー
 import Sidebar from '@/app/base/base/sidebar/sidebar';
 import ClipList from '@/app/base/clip/clipCluster';
 import PlayList from '@/app/base/playlist/playlist';

@@ -1,7 +1,10 @@
-import { redirect } from 'next/navigation'
+import { redirect } from 'next/navigation';
 
-export default async function ClipPage({ params }) {
-  // cookie設定付きリダイレクト用APIへ転送
-  redirect(`/api/redirectWithCookie?id=${id}`)
+export default function ClipPage({ params }) {
+  const id = params?.id;
+
+  if (!id) return <h1>Missing ID</h1>;
+
+  // ここでは cookie を書かず、API に任せる
+  redirect(`/api/redirectWithCookie?id=${id}`);
 }
-

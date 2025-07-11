@@ -1,36 +1,34 @@
-import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
-import { PrismaClient } from '@prisma/client'
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { prisma } from '@/lib/prisma';
 
-const prisma = new PrismaClient()
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const id = parseInt(searchParams.get('id'));
 
-export async function GET(request, { params }) {
-  const id = parseInt(params.id)
-  if (!id) {
-    return new Response("Invalid ID", { status: 400 })
+  if (!id) return new Response('Invalid ID', { status: 400 });
+
+  const clip = await prisma.clip.findUnique({ where: { id } });
+  if (!clip) return new Response('Not Found', { status: 404 });
+
+  const cookieStore = await cookies();
+  cookieStore.set('name', '切り抜き');
+  cookieStore.set('title', clip.title || '');
+  cookieStore.set('username', clip.user || '');
+  cookieStore.set('starttime', String(clip.startTime));
+  cookieStore.set('endtime', String(clip.endTime));
+  cookieStore.set('url', clip.url || '');
+
+  // サービス別のURL構築
+  let redirectUrl = '';
+  if (clip.service === 'Netflix') {
+    redirectUrl = `https://www.netflix.com${clip.url}?t=${Math.floor(clip.startTime)}`;
+  } else {
+    // 他サービス用のフォールバック（ここは任意で）
+    redirectUrl = clip.url.startsWith('http')
+      ? `${clip.url}?t=${Math.floor(clip.startTime)}`
+      : `https://example.com${clip.url}?t=${Math.floor(clip.startTime)}`;
   }
 
-  const clip = await prisma.clip.findUnique({ where: { id } })
-  if (!clip) {
-    return new Response("Clip not found", { status: 404 })
-  }
-
-  // クッキーを設定（サーバーサイド対応）
-  const cookieStore = cookies()
-  cookieStore.set('name', '切り抜き')
-  cookieStore.set('title', clip.title || '')
-  cookieStore.set('username', clip.user || '')
-  cookieStore.set('starttime', String(clip.startTime))
-  cookieStore.set('endtime', String(clip.endTime))
-  cookieStore.set('url', clip.url || '')
-
-  // リダイレクト先 URL を構築
-  const base = clip.service === 'Netflix'
-    ? 'https://www.netflix.com'
-    : clip.service === 'Prime'
-    ? 'https://www.amazon.co.jp/primevideo'
-    : ''
-  const redirectUrl = `${base}${clip.url}?t=${clip.startTime}`
-
-  redirect(redirectUrl)
+  return NextResponse.redirect(redirectUrl);
 }

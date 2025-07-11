@@ -32,7 +32,8 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
       if (urlLink) {
         //ここで拡張機能に、既に開いているnetflixタブがあるか確認してもらう その為の値を渡す
         console.log("open URL");
-        window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");// 実際にリンクを開く処理　t=時間で再生可能時間を指定できる。
+        // 実際にリンクを開く処理　t=時間で再生可能時間を指定できる。
+        window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");
         console.log("open URL now");
       } else {
         alert("Invalid link or unknown service");//eroorリンクへの変更

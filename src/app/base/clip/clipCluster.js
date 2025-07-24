@@ -64,12 +64,12 @@ export default function ClipList({ clipApiUrl }) {
           data.allReceivedData.map((item, index) => (
             <Clip
               key={index}
-              name="切り抜き"
+              name={item.clipName || "切り抜き"}
               title={item.title || "タイトルがありません"}
               epnum={item.epnumber || "エラー"}
               url={item.url || "/browse"}
-              username="ユーザー名"
-              icon="netflix"
+              username={item.user || "ユーザー名がありません"}
+              icon={item.service || "unknown"}
               starttime={item.startTime}
               endtime={item.endTime}
             />

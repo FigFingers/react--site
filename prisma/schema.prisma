@@ -15,6 +15,7 @@ datasource db {
 
 model Clip {
   id        Int      @id @default(autoincrement()) // 自動採番の主キー
+  clipName  String?                                //クリップ名
   user      String                                 // ユーザー名
   service   String                                 // Netflix, Primeなど
   startTime Float                                  // 開始時刻

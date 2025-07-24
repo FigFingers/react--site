@@ -91,12 +91,12 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
           data.allReceivedData.map((item, index) => (
             <Clip
               key={index}
-              name="切り抜き"
+              name={item.name || "名前がありません"}
               title={item.title || "タイトルがありません"}
               epnum={item.epnumber || "エラー"}
               url={item.URL || "/browse"}
-              username="ユーザー名"
-              icon="netflix"
+              username={item.user || "ユーザー名がありませんa"}
+              icon={item.icon || "unknown"}
               starttime={item.StartTime}
               endtime={item.EndTime}
             />

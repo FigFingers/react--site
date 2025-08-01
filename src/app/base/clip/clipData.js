@@ -2,7 +2,7 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
     // Link 生成
     let urlLink;
     switch (icon) {
-      case "netflix":
+      case "Netflix":
         urlLink = "https://www.netflix.com"+url;
         break;
       case "prime":

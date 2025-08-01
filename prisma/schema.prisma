@@ -15,13 +15,14 @@ datasource db {
 
 model Clip {
   id        Int      @id @default(autoincrement()) // 自動採番の主キー
+  clipName  String?                                //クリップ名
   user      String                                 // ユーザー名
   service   String                                 // Netflix, Primeなど
   startTime Float                                  // 開始時刻
   endTime   Float                                  // 終了時刻
   url       String                                 // 動画URLやパス
   title     String                                 // 動画タイトル
-  epnumber  String                                 // エピソード名や番号
+  epnumber  String  @default("エピソード不明")      // エピソード名や番号
   createdAt DateTime @default(now())               // 登録日時
 }
 

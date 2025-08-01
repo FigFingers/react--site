@@ -10,6 +10,7 @@ export async function POST(req) {
 
     const result = await prisma.clip.create({
       data: {
+        clipName:  data.clipName, 
         user:      data.user,
         service:   data.service,
         startTime: data.StartTime,

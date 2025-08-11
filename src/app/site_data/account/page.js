@@ -1,15 +1,13 @@
 "use client";
 import '@/app/globals.css';
-import HeadSearch from'@/app/base//base/headSearch/headSearch'; ; // ヘッダー
-import Sidebar from '@/app/base/base/sidebar/sidebar';
 import ClipList from '@/app/base/clip/clipCluster';
 import PlayList from '@/app/base/playlist/playlist';
 export default function App() {
   return (
     <>
-      <Sidebar />
+
       <div className="main-content">
-        <HeadSearch />
+
         <div className="user-info">
           <h3>ユーザー情報</h3>
           <button className="change-button">変更</button>

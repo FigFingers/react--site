@@ -15,19 +15,31 @@ html,body {
 }
 /* メインコンテンツ */
 .main-content {
-  margin-left: 250px;       /* サイドバーの幅分だけ余白を確保 */
-  padding: 20px;            /* 内側の余白 */
-  box-sizing: border-box;   /* パディングを含めてサイズを計算 */
-  min-height: 100vh;        /* 画面全体の高さ */
+  margin-left: 0;
+  padding: 20px 20px 20px 0; 
+  min-width: 0;      /* 子が横に広がっても潰れにくくする */
   background-color: #f5f5f5;
+  padding-top: 0;
+  margin-top: 0;
 }
+.app-shell {
+  display: grid;
+  grid-template-columns: 250px 1fr; /* 左: 250px / 右: 残り全て */
+  min-height: 100dvh;               /* モバイルでも安定 */
+}
+.app-container {
+  width: 100%;
+  max-width: 1100px;   /* 好みで 960 / 1100 / 1280 に調整 */
+  margin: 16px 20px 24px 0;
+  column-gap: 0;    
+  padding: 0 16px;
+}
+
 /* サイドバー */
 .sidebar {
-  position: fixed;
-  left: 0;
+  position: sticky;  /* スクロールしても見えるようにするなら sticky */
   top: 0;
-  height: 100%; 
-  width: 250px;
+  height: 100vh;     /* 100% だと親の高さに依存して縮むことがある */
   background-color: #2d445d;
 }
 
@@ -80,14 +92,18 @@ html,body {
 
 /* ヘッダー */
 .header {
-  display: flex;
+  position: sticky;     /* ← display: sticky は存在しないので修正 */
+  top: 0;
+  z-index: 10;
+  display: flex;        /* 本来やりたかったのはこれ */
   align-items: center;
   justify-content: space-between;
   background-color: #d3d3d3;
   padding: 10px 20px;
-  width: 100%; /* 必須 */
-  box-sizing: border-box; /* 必須 */
-  flex-shrink: 0; /* ヘッダーの高さを固定 */
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-top: 0; /* スクロール時にヘッダーが上に重ならないように */
 }
 .container {
   display: flex;
@@ -135,6 +151,7 @@ html,body {
   margin-top: 20px;
   background-color: #ffffff;
   border-top: 1px solid #ccc;
+  width: 100%;        /* これを明示 */
 }
 
 .list-item {

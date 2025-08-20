@@ -1,67 +1,43 @@
 // src/auth.ts
-import NextAuth from "next-auth";
+import NextAuth, { type DefaultSession } from "next-auth";
 import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { prisma } from "@/lib/prisma";
-import { issueUniqueHandle, normalizeNickname } from "@/lib/user-ids";
-import type { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma"; // エイリアス未設定なら "../lib/prisma" に変更
+
+// セッションに user.id を露出（UI側で扱いやすく）
+declare module "next-auth" {
+  interface Session {
+    user: DefaultSession["user"] & { id: string };
+  }
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "database" }, // どちらでも可。DBに寄せるならこちら
+  session: { strategy: "database" }, // DBセッション：User/Accountと同期が自然
+  trustHost: true,
+
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      // 検証時に同意画面を出したい場合（不要なら削ってOK）
       authorization: {
         params: {
           prompt: "consent select_account",
           include_granted_scopes: "false",
           access_type: "offline",
+          // hl: "ja",
         },
       },
-      // scope: "openid email profile" // 既定でOK
+      // scope: "openid email profile" // 既定で十分
     }),
   ],
+
+  // DBセッション時は user がDBのUser行。ここで id を session に出すだけ。
   callbacks: {
-    async signIn({ user, account, profile }) {
-      // ここで email（Gmail含む）を確実に保持
-      // Googleのprofile.emailは“Gmailとは限らない”点に注意（独自ドメインもある）
-      return true;
+    async session({ session, user }) {
+      if (session.user) (session.user as any).id = user.id;
+      return session;
     },
   },
-  events: {
-  async signIn({ user, profile }) {
-    const email = (profile as any)?.email ?? user.email ?? undefined;
-    const name  = (profile as any)?.name  ?? user.name  ?? undefined;
-
-    const existing = await prisma.user.findUnique({ where: { id: user.id } });
-    if (existing?.handle) return;
-
-    const seed   = (email?.split("@")[0] || name || "user").toString();
-    const handle = await issueUniqueHandle(seed);
-
-    // ★ ここを安全な型取りに置き換え
-    const data: Prisma.UserUpdateArgs["data"] = { handle };
-
-    if (!existing?.nickname && name) {
-      data.nickname     = name;
-      data.nicknameNorm = normalizeNickname(name);
-    }
-    if (!existing?.email && email) {
-      (data as any).email = email; // email は nullable 設計ならそのまま代入でOK
-    }
-
-    try {
-      await prisma.user.update({ where: { id: user.id }, data });
-    } catch (e: any) {
-      if (e.code === "P2002" && e.meta?.target?.includes("handle")) {
-        const fallback = await issueUniqueHandle(`user-${user.id.slice(0, 4)}`);
-        await prisma.user.update({ where: { id: user.id }, data: { handle: fallback } });
-      } else {
-        throw e;
-      }
-    }
-  },
-},
 });

@@ -32,7 +32,6 @@ model User {
   name  String?
   image String?
 
-  handle         String   @unique 
   nickname      String?
   nicknameNorm  String?   @unique
   // 認証用

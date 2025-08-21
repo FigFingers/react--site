@@ -14,19 +14,19 @@ export const SidebarData=[
     {
         title:"Account",
         icon:<AccountCircleIcon  />,
-        link:"/site_data/account",
+        link:"/account",
 
     },
     {
         title:"My_Video",
         icon:<MovieIcon />,
-        link:"/site_data/my_video",
+        link:"/my_video",
 
     },
     {
         title:"My_List",
         icon:<FolderIcon />,
-        link:"/site_data/mylist",
+        link:"/mylist",
 
     }
 ]

@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import { signIn } from "next-auth/react";
 
 function Page() {
   const [email, setEmail] = useState(""); // メールアドレスの状態
@@ -86,7 +87,7 @@ function Page() {
             <button
               className="login-button-test"
               onClick={() => {
-                window.location.href = "/site_data/registration";
+                window.location.href = "/registration";
               }}
             >
               新規会員登録
@@ -94,6 +95,11 @@ function Page() {
             <a href="#" className="login-link-test">
               会員登録について
             </a>
+
+            <br/>
+          <button onClick={() => signIn("google", { callbackUrl: "/account" })}>
+            Googleでログイン
+          </button>
           </div>
         </div>
       </main>

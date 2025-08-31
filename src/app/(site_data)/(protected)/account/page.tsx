@@ -1,7 +1,6 @@
 "use client";
 import '@/app/globals.css';
-import ClipList from '@/app/base/clip/clipCluster';
-import PlayList from '@/app/base/playlist/playlist';
+import React from 'react';
 export default function App() {
   return (
     <>

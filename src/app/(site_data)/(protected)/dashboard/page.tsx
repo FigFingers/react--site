@@ -1,4 +1,5 @@
 // src/app/(site_data)/(protected)/dashboard/page.tsx
+import React from 'react';
 import Image from "next/image";
 import { auth, signIn, signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";

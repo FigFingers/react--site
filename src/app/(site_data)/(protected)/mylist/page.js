@@ -1,6 +1,5 @@
 "use client";
 import '@/app/globals.css';
-import ClipList from '@/app/base/clip/clipCluster';
 import PlayList from '@/app/base/playlist/playlist';
 
 export default function app() {
@@ -9,7 +8,6 @@ export default function app() {
 
 <div className="main-content">
 
-  <ClipList clipApiUrl={process.env.NEXT_PUBLIC_API_URL} />
   <PlayList PlayList_Data_Url="/test_data/mylist.json"/>
 </div>
 </>

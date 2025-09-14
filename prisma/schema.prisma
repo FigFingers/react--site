@@ -38,6 +38,7 @@ model vods {
   clips          clips[]
   playlists_vods playlists_vods[]
   users_vods     users_vods[]
+  vod_aliases    vod_aliases[]
 
   @@unique([code])
   @@map("vods")

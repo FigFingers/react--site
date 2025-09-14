@@ -235,4 +235,4 @@ CREATE INDEX clips_title_trgm_gin
 
 -- クリップの長さ(ms)を生成列で保持（start_ms/end_ms から算出）
 ALTER TABLE "clips"
-  ADD COLUMN duration_ms int GENERATED ALWAYS AS (end_ms - start_ms) STORED;
+  ADD COLUMN duration_ms int GENERATED ALWAYS AS (end_ms - start_ms) STORED NOT NULL;

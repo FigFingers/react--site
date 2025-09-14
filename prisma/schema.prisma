@@ -14,9 +14,9 @@ model users {
   mail       String?   @db.Citext
   hashed_pw  String?   @db.VarChar(255)
   region     String?   @db.VarChar(255)
-  created_at DateTime  @default(now())  @db.Timestamptz(6)
-  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
-  deleted_at DateTime? @db.Timestamptz(6)    // ソフトデリート用
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6) // ソフトデリート用
 
   clips              clips[]
   playlists          playlists[]
@@ -29,10 +29,10 @@ model users {
 
 model vods {
   id         Int       @id @default(autoincrement())
-  code       String    @db.VarChar(50)   // 例: NETFLIX / PRIME_VIDEO / DISNEY_PLUS
-  name       String    @db.VarChar(255)  // 表示名: Netflix / Prime Video / Disney+
-  created_at DateTime  @default(now())   @db.Timestamptz(6)
-  updated_at DateTime  @updatedAt        @db.Timestamptz(6)
+  code       String    @db.VarChar(50) // 例: NETFLIX / PRIME_VIDEO / DISNEY_PLUS
+  name       String    @db.VarChar(255) // 表示名: Netflix / Prime Video / Disney+
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt @db.Timestamptz(6)
   deleted_at DateTime? @db.Timestamptz(6)
 
   clips          clips[]
@@ -46,10 +46,10 @@ model vods {
 
 // 別名吸収用（“Prime”, “AmazonPrime” など）
 model vod_aliases {
-  id         Int       @id @default(autoincrement())
+  id         Int      @id @default(autoincrement())
   vod_id     Int
-  alias      String    @db.Citext // 大文字小文字を区別しない別名
-  created_at DateTime  @default(now())   @db.Timestamptz(6)
+  alias      String   @db.Citext // 大文字小文字を区別しない別名
+  created_at DateTime @default(now()) @db.Timestamptz(6)
 
   vod vods @relation(fields: [vod_id], references: [id], onDelete: Cascade)
 
@@ -64,11 +64,11 @@ model clips {
   vod_id     Int
   name       String    @db.VarChar(255)
   title      String
-  views      BigInt    @db.BigInt @default(0) 
+  views      BigInt    @default(0) @db.BigInt
   start_ms   Int
   end_ms     Int
-  created_at DateTime  @default(now())  @db.Timestamptz(6)
-  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt @db.Timestamptz(6)
   deleted_at DateTime? @db.Timestamptz(6)
 
   user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
@@ -78,7 +78,7 @@ model clips {
   clips_playlists clips_playlists[]
 
   @@index([user_id, created_at])
-  @@index([vod_id, created_at]) 
+  @@index([vod_id, created_at])
   @@map("clips")
 }
 
@@ -86,11 +86,11 @@ model playlists {
   id         Int       @id @default(autoincrement())
   name       String    @db.VarChar(255)
   user_id    Int
-  created_at DateTime  @default(now())  @db.Timestamptz(6)
-  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
+  created_at DateTime  @default(now()) @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt @db.Timestamptz(6)
   deleted_at DateTime? @db.Timestamptz(6)
 
-  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  user            users                @relation(fields: [user_id], references: [id], onDelete: Cascade)
   clips_playlists clips_playlists[]
   playlists_vods  playlists_vods[]
   favorites       favorite_playlists[]

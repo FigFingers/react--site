@@ -1,70 +1,167 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
-model Clip {
-  id        Int      @id @default(autoincrement()) // 自動採番の主キー
-  clipName  String? //クリップ名
-  user      String // ユーザー名
-  service   String // Netflix, Primeなど
-  startTime Float // 開始時刻
-  endTime   Float // 終了時刻
-  url       String // 動画URLやパス
-  title     String // 動画タイトル
-  epnumber  String   @default("エピソード不明") // エピソード名や番号
-  createdAt DateTime @default(now()) // 登録日時
+model users {
+  id         Int       @id @default(autoincrement())
+  name       String?   @db.VarChar(255)
+  mail       String?   @db.Citext
+  hashed_pw  String?   @db.VarChar(255)
+  region     String?   @db.VarChar(255)
+  created_at DateTime  @default(now())  @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
+
+  clips              clips[]
+  playlists          playlists[]
+  favorite_clips     favorite_clips[]
+  favorite_playlists favorite_playlists[]
+  users_vods         users_vods[]
+
+  @@map("users")
 }
 
-model User {
-  id    String  @id @default(cuid())
-  email String  @unique
-  name  String?
-  image String?
+model vods {
+  id         Int       @id @default(autoincrement())
+  code       String    @db.VarChar(50)   // 例: NETFLIX / PRIME_VIDEO / DISNEY_PLUS
+  name       String    @db.VarChar(255)  // 表示名: Netflix / Prime Video / Disney+
+  created_at DateTime  @default(now())   @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt        @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
 
-  nickname      String?
-  nicknameNorm  String?   @unique
-  // 認証用
-  passwordHash  String? // Credentials用（Googleのみ運用なら不要）
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
+  clips          clips[]
+  playlists_vods playlists_vods[]
+  users_vods     users_vods[]
+
+  @@unique([code])
+  @@map("vods")
 }
 
-model Account {
-  id                String  @id @default(cuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+// 別名吸収用（“Prime”, “AmazonPrime” など）
+model vod_aliases {
+  id         Int       @id @default(autoincrement())
+  vod_id     Int
+  alias      String    @db.Citext
+  created_at DateTime  @default(now())   @db.Timestamptz(6)
 
-  @@unique([provider, providerAccountId])
+  vod vods @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@unique([alias])
+  @@index([vod_id])
+  @@map("vod_aliases")
 }
 
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+model clips {
+  id         Int       @id @default(autoincrement())
+  user_id    Int
+  vod_id     Int
+  name       String    @db.VarChar(255)
+  title      String
+  views      BigInt    @db.BigInt @default(0)
+  start      Int
+  end        Int
+  created_at DateTime  @default(now())  @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  vod  vods  @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  favorites       favorite_clips[]
+  clips_playlists clips_playlists[]
+
+  @@index([user_id, created_at])
+  @@index([vod_id, created_at]) 
+  @@map("clips")
+}
+
+model playlists {
+  id         Int       @id @default(autoincrement())
+  name       String    @db.VarChar(255)
+  user_id    Int
+  created_at DateTime  @default(now())  @db.Timestamptz(6)
+  updated_at DateTime  @updatedAt       @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  clips_playlists clips_playlists[]
+  playlists_vods  playlists_vods[]
+  favorites       favorite_playlists[]
+
+  @@index([user_id, created_at])
+  @@map("playlists")
+}
+
+model users_vods {
+  user_id    Int
+  vod_id     Int
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  vod  vods  @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, vod_id])
+  @@index([vod_id])
+  @@map("users_vods")
+}
+
+model clips_playlists {
+  clip_id     Int
+  playlist_id Int
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  clip     clips     @relation(fields: [clip_id], references: [id], onDelete: Cascade)
+  playlist playlists @relation(fields: [playlist_id], references: [id], onDelete: Cascade)
+
+  @@id([clip_id, playlist_id])
+  @@index([playlist_id, created_at])
+  @@map("clips_playlists")
+}
+
+model playlists_vods {
+  playlist_id Int
+  vod_id      Int
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  playlist playlists @relation(fields: [playlist_id], references: [id], onDelete: Cascade)
+  vod      vods      @relation(fields: [vod_id], references: [id], onDelete: Cascade)
+
+  @@id([playlist_id, vod_id])
+  @@index([vod_id])
+  @@index([playlist_id, created_at])
+  @@map("playlists_vods")
+}
+
+model favorite_clips {
+  user_id    Int
+  clip_id    Int
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+
+  user users @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  clip clips @relation(fields: [clip_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, clip_id])
+  @@index([user_id, created_at])
+  @@index([clip_id])
+  @@map("favorite_clips")
+}
+
+model favorite_playlists {
+  user_id     Int
+  playlist_id Int
+  created_at  DateTime @default(now()) @db.Timestamptz(6)
+
+  user     users     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  playlist playlists @relation(fields: [playlist_id], references: [id], onDelete: Cascade)
+
+  @@id([user_id, playlist_id])
+  @@index([user_id, created_at])
+  @@index([playlist_id])
+  @@map("favorite_playlists")
 }

@@ -77,8 +77,9 @@ model clips {
   favorites       favorite_clips[]
   clips_playlists clips_playlists[]
 
-  @@index([user_id, created_at])
-  @@index([vod_id, created_at])
+  // 部分インデックスにSQL側で差し替えたためコメントアウト
+  //  @@index([user_id, created_at])
+  //  @@index([vod_id, created_at])
   @@map("clips")
 }
 
@@ -95,7 +96,8 @@ model playlists {
   playlists_vods  playlists_vods[]
   favorites       favorite_playlists[]
 
-  @@index([user_id, created_at])
+  // 部分インデックスにSQL側で差し替えたためコメントアウト
+  //  @@index([user_id, created_at])
   @@map("playlists")
 }
 

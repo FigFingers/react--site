@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 export async function GET() {
   try {
     // DBから最大200件を取得してランダムに20件選出（全体の件数に応じて調整可）
-    const allClips = await prisma.clip.findMany({
+    const allClips = await prisma.clips.findMany({
       take: 200,
-      orderBy: { createdAt: 'desc' }, // 任意（ここはランダム性に関係しない）
+      orderBy: { created_at: 'desc' }, // 任意（ここはランダム性に関係しない）
     });
 
     // シャッフルして20件選出

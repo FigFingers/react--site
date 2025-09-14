@@ -16,7 +16,7 @@ model users {
   region     String?   @db.VarChar(255)
   created_at DateTime  @default(now())  @db.Timestamptz(6)
   updated_at DateTime  @updatedAt       @db.Timestamptz(6)
-  deleted_at DateTime? @db.Timestamptz(6)
+  deleted_at DateTime? @db.Timestamptz(6)    // ソフトデリート用
 
   clips              clips[]
   playlists          playlists[]
@@ -47,7 +47,7 @@ model vods {
 model vod_aliases {
   id         Int       @id @default(autoincrement())
   vod_id     Int
-  alias      String    @db.Citext
+  alias      String    @db.Citext // 大文字小文字を区別しない別名
   created_at DateTime  @default(now())   @db.Timestamptz(6)
 
   vod vods @relation(fields: [vod_id], references: [id], onDelete: Cascade)
@@ -63,9 +63,9 @@ model clips {
   vod_id     Int
   name       String    @db.VarChar(255)
   title      String
-  views      BigInt    @db.BigInt @default(0)
-  start      Int
-  end        Int
+  views      BigInt    @db.BigInt @default(0) 
+  start_ms   Int
+  end_ms     Int
   created_at DateTime  @default(now())  @db.Timestamptz(6)
   updated_at DateTime  @updatedAt       @db.Timestamptz(6)
   deleted_at DateTime? @db.Timestamptz(6)

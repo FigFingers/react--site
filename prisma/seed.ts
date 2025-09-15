@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.vods.createMany({
+  await prisma.Vod.createMany({
     data: [
       { code: 'NETFLIX',     name: 'Netflix' },
       { code: 'PRIME_VIDEO', name: 'Prime Video' },

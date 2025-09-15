@@ -7,7 +7,7 @@ export async function GET(req) {
 
   try {
     // 完全一致検索
-    const exactMatch = await prisma.clips.findMany({
+    const exactMatch = await prisma.clip.findMany({
       where: {
         title: keyword,
         ...(user && { user }),

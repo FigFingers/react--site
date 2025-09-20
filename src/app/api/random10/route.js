@@ -5,7 +5,7 @@ export async function GET() {
     // DBから最大200件を取得してランダムに20件選出（全体の件数に応じて調整可）
     const allClips = await prisma.clip.findMany({
       take: 200,
-      orderBy: { created_at: 'desc' }, // 任意（ここはランダム性に関係しない）
+      orderBy: { createdAt: 'desc' }, // 任意（ここはランダム性に関係しない）
     });
 
     // シャッフルして20件選出

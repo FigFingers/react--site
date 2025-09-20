@@ -1,4 +1,6 @@
 // prisma/schema.prisma
+// SQLにも追加したものが多々あるので参照されたし
+
 generator client {
   provider = "prisma-client-js"
 }

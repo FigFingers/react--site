@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "biome check .",
+    "lint:fix": "biome check --apply .",
+    "format": "biome format --write ."
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

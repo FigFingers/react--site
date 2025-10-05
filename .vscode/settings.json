@@ -9,7 +9,10 @@
   "[json]": { "editor.defaultFormatter": "biomejs.biome" },
 
   // 保存時のインポート整理（VSCode側）：二重実行が気になるなら "explicit" に
-  "editor.codeActionsOnSave": { "source.organizeImports": "explicit" },
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "never",
+    "source.fixAll": "always"
+  },
 
   // 競合しがちな拡張は無効化（入っているなら）
   "prettier.enable": false,

@@ -1,5 +1,6 @@
 // prisma/schema.prisma
-// SQLにも追加したものが多々あるので参照されたし
+/// @raw.sql CREATE EXTENSION IF NOT EXISTS citext;
+/// @raw.sql CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 generator client {
   provider = "prisma-client-js"
@@ -36,6 +37,7 @@ model User {
   favoritePlaylists FavoritePlaylist[]
   usersVods         UserVod[]
 
+  /// @@partialUnique([email])
   @@map("users")
 }
 
@@ -52,9 +54,8 @@ model Vod {
   usersVods     UserVod[]
   vodAliases    VodAlias[]
 
-  // SQL部分ユニークに置換
-  // @@unique([name])
-  @@unique([code])
+  /// @@partialUnique([name])
+  /// @@partialUnique([code])
   @@map("vods")
 }
 
@@ -86,7 +87,8 @@ model Clip {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
-  durationMs Int       @default(dbgenerated()) @map("duration_ms")
+  /// @raw.sql ALTER TABLE "public"."clips"
+  ///   ADD COLUMN "duration_ms" int GENERATED ALWAYS AS (end_ms - start_ms) STORED NOT NULL;
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
@@ -94,9 +96,8 @@ model Clip {
   favorites      FavoriteClip[]
   clipsPlaylists ClipPlaylist[]
 
-  // SQL部分インデックスに置換
-  // @@index([userId, createdAt])
-  // @@index([vodId, createdAt])
+  /// @@partialIndex([userId, createdAt])
+  /// @@partialIndex([vodId, createdAt])
   @@map("clips")
 }
 
@@ -113,10 +114,8 @@ model Playlist {
   playlistsVods  PlaylistVod[]
   favorites      FavoritePlaylist[]
 
-  // SQL部分ユニークに置換
-  // @@unique([user_id, name])
-  // SQL部分インデックスに置換
-  // @@index([userId, createdAt])
+  /// @@partialUnique([userId, name])
+  /// @@partialIndex([userId, createdAt])
   @@map("playlists")
 }
 
@@ -231,3 +230,11 @@ model VerificationToken {
   @@id([identifier, token])
   @@map("verification_tokens")
 }
+
+/// @raw.sql ALTER TABLE "public"."clips"
+///   ADD CONSTRAINT clips_time_ck CHECK (start_ms >= 0 AND end_ms > start_ms);
+
+/// @raw.sql CREATE EXTENSION IF NOT EXISTS pg_trgm;
+/// CREATE INDEX clips_title_trgm_gin
+///   ON  "public"."clips" USING GIN (title gin_trgm_ops)
+///   WHERE deleted_at IS NULL;

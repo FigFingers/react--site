@@ -1,17 +1,15 @@
+// biome-ignore-all lint/suspicious/noQuickfixBiome: Scripts are broken by quickfix when nested.
 {
   "editor.formatOnSave": true,
 
   // Biome を既定フォーマッタに
-  "[javascript]": { "editor.defaultFormatter": "biomejs.biome" },
-  "[typescript]": { "editor.defaultFormatter": "biomejs.biome" },
-  "[javascriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
-  "[typescriptreact]": { "editor.defaultFormatter": "biomejs.biome" },
-  "[json]": { "editor.defaultFormatter": "biomejs.biome" },
+  "editor.defaultFormatter": "biomejs.biome",
 
   // 保存時のインポート整理（VSCode側）：二重実行が気になるなら "explicit" に
   "editor.codeActionsOnSave": {
     "source.organizeImports": "never",
-    "source.fixAll": "always"
+    "quickfix.biome": "never",
+    "source.fixAll.biome": "explicit"
   },
 
   // 競合しがちな拡張は無効化（入っているなら）

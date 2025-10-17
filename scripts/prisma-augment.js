@@ -1,8 +1,10 @@
 // scripts/prisma-partials.js
 // 宣言的 @@partialIndex / @@partialUnique と /// @raw.sql を解析し、
 // 生成SQLを「過去生成分との差分のみ」最新 migration.sql に追記（または置換）する。
-// - ドライラン: --check / 環境変数 DRY_RUN=1
-// - 履歴重複排除: 過去の GENERATED_PARTIALS_* ブロックから既出SQLを収集し、新規分のみ出力
+// - ドライラン: `--check` か環境変数 `DRY_RUN=1`
+// - 履歴重複排除: 過去の GENERATED_(EXTENSIONS|AUGMENT|PARTIALS) ブロックから既出SQLを収集
+// - 定義ベースのデデュープ: テーブル/列順/WHERE/UNIQUE が一致すれば、インデックス名が違っても重複扱い
+// - 同一 migration 内の DROP/ADD 衝突を自動回避
 //
 // biome-ignore-all lint/suspicious/noConsole: cli script
 
@@ -14,16 +16,25 @@ const SCHEMA = path.resolve("prisma/schema.prisma");
 const MIGRATIONS_DIR = path.resolve("prisma/migrations");
 
 const DEFAULT_SCHEMA = "public";
-const ORDER = ["partialIndex", "partialUnique", "raw"]; // kind の出力順
+const ORDER = ["partialIndex", "partialUnique", "raw"]; // 出力順
 
 const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
 
-// ========== 便利関数 ==========
+const EXT_MARK = "GENERATED_EXTENSIONS";
+const REST_MARK = "GENERATED_AUGMENT";
+
+// ========== 共通ユーティリティ ==========
+function makeBundle(mark, hash, body, label) {
+  return (
+    `\n-- ${mark}_BEGIN ${hash}\n` +
+    `-- 以下は schema.prisma の注釈から自動生成されています (${label})\n` +
+    body +
+    `\n-- ${mark}_END ${hash}\n`
+  );
+}
 function readSchema() {
   return fs.readFileSync(SCHEMA, "utf8");
 }
-
-// 識別子(未クォート名)の安全化
 function safeIdent(name) {
   return String(name || "")
     .trim()
@@ -32,49 +43,6 @@ function safeIdent(name) {
     .replace(/^_+/, "")
     .slice(0, 63);
 }
-
-// @@map/@map を考慮して model/field→table/column を解決
-function buildModelMap(schemaText) {
-  const lines = schemaText.split(/\r?\n/);
-  const models = {};
-  let cur = null;
-
-  for (const line of lines) {
-    const mStart = line.match(/^\s*model\s+(\w+)\s*\{/);
-    if (mStart) {
-      cur = { name: mStart[1], table: null, fields: {} };
-      models[cur.name] = cur;
-      continue;
-    }
-    if (!cur) continue;
-
-    if (/^\s*\}/.test(line)) {
-      if (!cur.table) cur.table = cur.name;
-      cur = null;
-      continue;
-    }
-
-    const tmap = line.match(/@@map\(\s*"([^"]+)"\s*\)/);
-    if (tmap) {
-      cur.table = tmap[1];
-      continue;
-    }
-
-    const fmap = line.match(/^\s*(\w+)\s+[^\s{]+[^@{]*@map\(\s*"([^"]+)"\s*\)/);
-    if (fmap) {
-      cur.fields[fmap[1]] = fmap[2];
-      continue;
-    }
-
-    const fonly = line.match(/^\s*(\w+)\s+[^\s{]+/);
-    if (fonly && !cur.fields[fonly[1]]) {
-      cur.fields[fonly[1]] = fonly[1];
-    }
-  }
-  return models;
-}
-
-// オプション "key=value, key2='a, b'" の安全分割と解析
 function splitTopLevel(s) {
   const out = [];
   let cur = "";
@@ -101,7 +69,7 @@ function parseOptions(s) {
   const opts = {};
   if (!s) return opts;
   for (const part of splitTopLevel(s)) {
-    const m = part.match(/^\s*(\w+)\s*[:=]\s*(.+)\s*$/); // name: "x" も name="x" も許容
+    const m = part.match(/^\s*(\w+)\s*[:=]\s*(.+)\s*$/); // name="x" も name: "x" も許容
     if (!m) continue;
     const k = m[1];
     let v = m[2].trim();
@@ -113,25 +81,19 @@ function parseOptions(s) {
   }
   return opts;
 }
-
-// 終端セミコロンの正規化
 function normalizeTerminator(sql) {
   const t = String(sql || "").trim();
   if (/DO\s+\$\$[\s\S]*\$\$\s*;?\s*$/i.test(t))
     return t.replace(/\s*;?\s*$/, ";");
   return t.replace(/;?\s*$/, ";");
 }
-
-// 生成済みSQLの重複検出のための簡易正規化
 function normalizeForDedup(sql) {
   return String(sql || "")
-    .replace(/--.*$/gm, "") // 行末コメント除去
-    .replace(/\s+/g, " ") // 連続空白→1
-    .replace(/\s*;\s*$/, ";") // 末尾セミコロン統一
+    .replace(/--.*$/gm, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*;\s*$/, ";")
     .trim();
 }
-
-// セミコロン区切り文分割（DO $$ ... $$; は1文）
 function splitStatements(text) {
   const out = [];
   let buf = "";
@@ -140,11 +102,10 @@ function splitStatements(text) {
   const s = String(text || "");
   while (i < s.length) {
     if (!inDollar) {
-      // DO $$
-      if (s.slice(i).match(/^DO\s+\$\$/i)) {
-        const m = s.slice(i).match(/^DO\s+\$\$/i)[0];
-        buf += m;
-        i += m.length;
+      const head = s.slice(i).match(/^DO\s+\$\$/i);
+      if (head) {
+        buf += head[0];
+        i += head[0].length;
         inDollar = true;
         continue;
       }
@@ -158,13 +119,12 @@ function splitStatements(text) {
       buf += ch;
       i++;
     } else {
-      // $$; まで
-      const m2 = s.slice(i).match(/^\$\$\s*;/);
-      if (m2) {
-        buf += m2[0];
+      const tail = s.slice(i).match(/^\$\$\s*;/);
+      if (tail) {
+        buf += tail[0];
         out.push(buf.trim());
         buf = "";
-        i += m2[0].length;
+        i += tail[0].length;
         inDollar = false;
         continue;
       }
@@ -176,41 +136,91 @@ function splitStatements(text) {
   return out;
 }
 
-// 既存 migrations から GENERATED ブロック内の「既出SQL集合」を収集
-function loadHistoricalGeneratedSqlSet() {
-  const seen = new Set();
-  if (!fs.existsSync(MIGRATIONS_DIR)) return seen;
+// ========== Prisma schema → 物理名マップ ==========
+function buildModelMap(schemaText) {
+  const lines = schemaText.split(/\r?\n/);
+  const models = {}; // { Model: { table, fields: { logical -> physical } } }
+  let cur = null;
+
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+
+    const mStart = line.match(/^\s*model\s+(\w+)\s*\{/);
+    if (mStart) {
+      cur = { name: mStart[1], table: null, fields: {} };
+      models[cur.name] = cur;
+      continue;
+    }
+    if (!cur) continue;
+
+    if (/^\s*\}/.test(line)) {
+      if (!cur.table) cur.table = cur.name;
+      cur = null;
+      continue;
+    }
+
+    const tmap = line.match(/@@map\(\s*"([^"]+)"\s*\)/);
+    if (tmap) {
+      cur.table = tmap[1];
+      continue;
+    }
+
+    const fhead = line.match(/^\s*(\w+)\s+[^{\s][^\n]*$/);
+    if (
+      fhead &&
+      !line.trimStart().startsWith("@@") &&
+      !line.trimStart().startsWith("//")
+    ) {
+      const logical = fhead[1];
+      if (!Object.hasOwn(cur.fields, logical)) {
+        cur.fields[logical] = logical;
+      }
+      const mapm = line.match(/@map\(\s*"([^"]+)"\s*\)/);
+      if (mapm) {
+        cur.fields[logical] = mapm[1];
+      }
+    }
+  }
+  return models;
+}
+
+function loadHistoricalKeys() {
+  const keys = new Set();
+  if (!fs.existsSync(MIGRATIONS_DIR)) return keys;
   const dirs = fs
     .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory())
     .map((d) => d.name)
     .sort();
 
-  const blockRe =
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm;
+  const blockRes = [
+    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+  ];
 
   for (const d of dirs) {
     const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
-    let m;
-    while (true) {
-      m = blockRe.exec(txt);
-      if (m === null) break;
-      const body = m[1] || "";
-      // kind 行はそのまま流し、SQL 文だけ抽出
-      const stmts = splitStatements(body).filter(
-        (st) => st && !/^--\s*kind:/i.test(st),
-      );
-      for (const st of stmts) {
-        seen.add(normalizeForDedup(st));
+
+    for (const re of blockRes) {
+      let m;
+      while (true) {
+        m = re.exec(txt);
+        if (m === null) break;
+        const body = m[1] || "";
+        const stmts = splitStatements(body).filter(Boolean);
+        for (const st of stmts) {
+          keys.add(hashForStatement(st));
+        }
       }
     }
   }
-  return seen;
+  return keys;
 }
 
-// 最新 migration ディレクトリ取得（タイムスタンプ接頭辞優先→mtime）
+// ========== 追加のヘルパ ==========
 function pickLatestMigrationDir() {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     throw new Error(
@@ -253,11 +263,80 @@ function pickLatestMigrationDir() {
   }
   return path.join(MIGRATIONS_DIR, latest);
 }
-
 function writeFileAtomic(filePath, content) {
   const tmp = `${filePath}.tmp`;
   fs.writeFileSync(tmp, content, "utf8");
   fs.renameSync(tmp, filePath);
+}
+function writeBlockAtTop(filePath, block, dryRun) {
+  const txt = fs.readFileSync(filePath, "utf8");
+  const beginReTop = new RegExp(
+    `^-- ${EXT_MARK}_BEGIN [a-f0-9]{12}[\\s\\S]*?-- ${EXT_MARK}_END [a-f0-9]{12}\\s*\\n?`,
+    "m",
+  );
+
+  let next;
+  if (beginReTop.test(txt)) {
+    next = txt.replace(beginReTop, `${block}\n`);
+  } else {
+    next = `${block}\n${txt}`;
+  }
+
+  if (dryRun) {
+    console.log("[DRY-RUN] would write EXTENSIONS block at file head:");
+    console.log(`  ${filePath}`);
+    console.log(block.trimEnd());
+    return txt;
+  } else {
+    writeFileAtomic(filePath, next);
+    return next;
+  }
+}
+function isCreateExtension(stmt) {
+  return /^\s*CREATE\s+EXTENSION\b/i.test(stmt);
+}
+function hashForBundle(body) {
+  return crypto
+    .createHash("sha256")
+    .update(normalizeForDedup(body))
+    .digest("hex")
+    .slice(0, 12);
+}
+
+function hashForStatement(sql) {
+  return crypto
+    .createHash("sha256")
+    .update(normalizeForDedup(sql)) // コメント除去・空白正規化・末尾;統一
+    .digest("hex")
+    .slice(0, 12); // 好みで桁数変更可（12桁で十分衝突耐性あり）
+}
+
+// ========== 同一 migration 内の DROP/ADD 衝突回避 ==========
+function filterConflictsWithFile(stmts, migrationSql) {
+  const drops = new Set();
+  const dropRe = /ALTER\s+TABLE\s+"?([\w.]+)"?\s+DROP\s+COLUMN\s+"?([\w]+)"?/gi;
+  let m;
+  while (true) {
+    m = dropRe.exec(migrationSql);
+    if (m === null) break;
+    drops.add(`${m[1]}::${m[2]}`.toLowerCase());
+  }
+
+  return stmts.filter((x) => {
+    const add = x.stmt.match(
+      /ALTER\s+TABLE\s+"?([\w.]+)"?\s+ADD\s+COLUMN\s+"?([\w]+)"/i,
+    );
+    if (add) {
+      const key = `${add[1]}::${add[2]}`.toLowerCase();
+      if (drops.has(key)) {
+        console.warn(
+          `WARN: Skipped ADD COLUMN that conflicts with DROP COLUMN in this migration: ${key}`,
+        );
+        return false;
+      }
+    }
+    return true;
+  });
 }
 
 // ========== 抽出: @@partialIndex / @@partialUnique / @raw.sql ==========
@@ -279,7 +358,6 @@ function extractDeclarativePartialIndexes(schemaText, modelMap) {
       continue;
     }
 
-    // コメント化ディレクティブ: /// @@partialIndex([...])
     const m = line.match(
       /^\s*\/\/\/\s*@@partialIndex\s*\(\s*\[([^\]]+)\]\s*(?:,([^)]*))?\)/,
     );
@@ -294,14 +372,12 @@ function extractDeclarativePartialIndexes(schemaText, modelMap) {
     const info = modelMap[currentModel] || { table: currentModel, fields: {} };
     const table = info.table || currentModel;
 
-    // 論理名→物理名（見つからなければ物理名とみなす）
     const cols = fieldList.map((f) => info.fields?.[f] || f);
 
     const opts = parseOptions(optionsRaw); // name / where / unique / schema
     const name = safeIdent(opts.name || `${table}_${cols.join("_")}_idx`);
     const schema = opts.schema || DEFAULT_SCHEMA;
 
-    // deleted_at が物理列として存在するなら WHERE 既定補完
     const hasDeleted = Object.values(info.fields || {}).includes("deleted_at");
     const where =
       opts.where !== undefined
@@ -318,7 +394,6 @@ function extractDeclarativePartialIndexes(schemaText, modelMap) {
   }
   return blocks;
 }
-
 function extractDeclarativePartialUniques(schemaText, modelMap) {
   const lines = schemaText.split(/\r?\n/);
   const blocks = [];
@@ -336,7 +411,6 @@ function extractDeclarativePartialUniques(schemaText, modelMap) {
       continue;
     }
 
-    // コメント化ディレクティブ: /// @@partialUnique([...])
     const m = line.match(
       /^\s*\/\/\/\s*@@partialUnique\s*\(\s*\[([^\]]+)\]\s*(?:,([^)]*))?\)/,
     );
@@ -357,6 +431,7 @@ function extractDeclarativePartialUniques(schemaText, modelMap) {
       opts.name || `${table}_${cols.join("_")}_unique_active`,
     );
     const schema = opts.schema || DEFAULT_SCHEMA;
+
     const hasDeleted = Object.values(info.fields || {}).includes("deleted_at");
     const where =
       opts.where !== undefined
@@ -373,7 +448,6 @@ function extractDeclarativePartialUniques(schemaText, modelMap) {
   }
   return blocks;
 }
-
 function extractRawSqlBlocks(schemaText) {
   const lines = schemaText.split(/\r?\n/);
   const blocks = [];
@@ -389,7 +463,7 @@ function extractRawSqlBlocks(schemaText) {
       const next = lines[j];
       const mm = next.match(/^\s*\/\/\/\s(.*)$/);
       if (!mm) break;
-      if (mm[1].trim().startsWith("@")) break; // 次のタグで打ち切り
+      if (mm[1].trim().startsWith("@")) break;
       sql += `\n${mm[1]}`;
       j++;
     }
@@ -405,13 +479,12 @@ function main() {
   const schema = readSchema();
   const modelMap = buildModelMap(schema);
 
-  // 1) 宣言的 + RAW を抽出
+  // 1) 抽出
   const blocks = [
     ...extractDeclarativePartialIndexes(schema, modelMap),
     ...extractDeclarativePartialUniques(schema, modelMap),
     ...extractRawSqlBlocks(schema),
   ];
-
   if (blocks.length === 0) {
     console.log(
       "No @@partial(Index|Unique) or @raw.sql blocks found. Skipped.",
@@ -419,8 +492,8 @@ function main() {
     return;
   }
 
-  // 2) kind順に並べる＆「文単位」に展開して kind 情報を保持
-  const expanded = []; // [{kind, stmt}]
+  // 2) kind順に展開
+  const expanded = [];
   for (const k of ORDER) {
     for (const b of blocks.filter((x) => x.kind === k)) {
       const stmts = splitStatements(b.sql);
@@ -430,72 +503,123 @@ function main() {
       }
     }
   }
-
   if (expanded.length === 0) {
     console.log("No SQL statements after expansion. Skipped.");
     return;
   }
 
-  // 3) 履歴から既出SQL集合をロードし、新規だけ残す
-  const seen = loadHistoricalGeneratedSqlSet();
-  const news = expanded.filter((x) => !seen.has(normalizeForDedup(x.stmt)));
+  // 3) 最新 migration.sql 読み込み & 同一ファイル内衝突回避
+  const latestDir = pickLatestMigrationDir();
+  const migrationPath = path.join(latestDir, "migration.sql");
+  const migrationSqlNow = fs.readFileSync(migrationPath, "utf8");
+  const expandedNoConflicts = filterConflictsWithFile(
+    expanded,
+    migrationSqlNow,
+  );
 
-  if (news.length === 0) {
-    const msg = "No new SQL statements to emit (deduped by history). Skipped.";
+  // 4) 同一ラン内デデュープ（ハッシュ方式）
+  const seenThisRun = new Set();
+  const dedupedThisRun = [];
+  for (const x of expandedNoConflicts) {
+    const h = hashForStatement(x.stmt);
+    if (seenThisRun.has(h)) continue;
+    seenThisRun.add(h);
+    // ハッシュを持たせておくと後段も楽
+    dedupedThisRun.push({ ...x, hash: h });
+  }
+
+  // 5) 履歴ハッシュを収集して差分だけ残す
+  const histKeys = loadHistoricalKeys();
+  const news = dedupedThisRun.filter((x) => !histKeys.has(x.hash));
+
+  // 6) EXT と REST に分割
+  const newsExt = news.filter((x) => isCreateExtension(x.stmt));
+  const newsRest = news.filter((x) => !isCreateExtension(x.stmt));
+
+  const bundleBodyExt = newsExt
+    .map((x) => `-- kind: ${x.kind}\n${x.stmt}`)
+    .join("\n\n");
+  const bundleBodyRest = newsRest
+    .map((x) => `-- kind: ${x.kind}\n${x.stmt}`)
+    .join("\n\n");
+
+  if (!bundleBodyExt && !bundleBodyRest) {
+    const msg =
+      "No new SQL statements to emit (after EXT/REST split). Skipped.";
     if (DRY_RUN) console.log(`[DRY-RUN] ${msg}`);
     else console.log(msg);
     return;
   }
 
-  // 4) バンドル本文（kind ヘッダ付きで再構成）
-  const bundleBody = news
-    .map((x) => `-- kind: ${x.kind}\n${x.stmt}`)
-    .join("\n\n");
+  // 7) バンドル生成
+  const extHash = bundleBodyExt ? hashForBundle(bundleBodyExt) : null;
+  const restHash = bundleBodyRest ? hashForBundle(bundleBodyRest) : null;
 
-  // ハッシュは“意味的差分に強い”よう軽く正規化してから算出
-  const markerHash = crypto
-    .createHash("sha256")
-    .update(normalizeForDedup(bundleBody))
-    .digest("hex")
-    .slice(0, 12);
+  const extBundle = bundleBodyExt
+    ? makeBundle(EXT_MARK, extHash, bundleBodyExt, "extensions")
+    : "";
+  const restBundle = bundleBodyRest
+    ? makeBundle(
+        REST_MARK,
+        restHash,
+        bundleBodyRest,
+        "partialIndex/partialUnique/raw",
+      )
+    : "";
 
-  const bundle =
-    `\n-- GENERATED_PARTIALS_BEGIN ${markerHash}\n` +
-    `-- 以下は schema.prisma の注釈から自動生成されています (partialIndex/partialUnique/raw)\n` +
-    bundleBody +
-    `\n` +
-    `-- GENERATED_PARTIALS_END ${markerHash}\n`;
+  // 8) 書き込み：EXTは先頭、RESTは末尾（既存なら置換）
+  let migrationSql = migrationSqlNow;
 
-  // 5) 最新 migration.sql の GENERATED ブロックは「置換」。なければ追記。
-  const latestDir = pickLatestMigrationDir();
-  const migrationPath = path.join(latestDir, "migration.sql");
-  const migrationSql = fs.readFileSync(migrationPath, "utf8");
-  const beginRe =
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}[\s\S]*?-- GENERATED_PARTIALS_END [a-f0-9]{12}\s*/m;
-  const willReplace = beginRe.test(migrationSql);
-  const nextSql = willReplace
-    ? migrationSql.replace(beginRe, bundle)
-    : migrationSql + bundle;
-
-  if (DRY_RUN) {
-    console.log(
-      "[DRY-RUN] prisma-partials would " +
-        (willReplace ? "replace" : "append") +
-        " block in:",
-    );
-    console.log(`  ${migrationPath}`);
-    console.log("Hash:", markerHash);
-    console.log("--- bundle begin ---");
-    console.log(bundle.trimEnd());
-    console.log("--- bundle end ---");
-    console.log("(no file written)");
-    return;
+  if (extBundle) {
+    migrationSql = writeBlockAtTop(migrationPath, extBundle, DRY_RUN);
+    if (!DRY_RUN) migrationSql = fs.readFileSync(migrationPath, "utf8");
   }
 
-  writeFileAtomic(migrationPath, nextSql);
-  console.log(
-    `prisma-partials: ${willReplace ? "updated" : "appended"} (hash=${markerHash}, file=${migrationPath})`,
-  );
+  if (restBundle) {
+    const restRe = new RegExp(
+      `-- ${REST_MARK}_BEGIN [a-f0-9]{12}[\\s\\S]*?-- ${REST_MARK}_END [a-f0-9]{12}\\s*`,
+      "m",
+    );
+    const willReplace = restRe.test(migrationSql);
+    const nextSql = willReplace
+      ? migrationSql.replace(restRe, restBundle)
+      : migrationSql + restBundle;
+
+    if (DRY_RUN) {
+      console.log(
+        "[DRY-RUN] prisma-partials would " +
+          (willReplace ? "replace" : "append") +
+          " REST block in:",
+      );
+      console.log(`  ${migrationPath}`);
+      console.log("EXT Hash:", extHash);
+      console.log("REST Hash:", restHash);
+      console.log("--- EXT bundle begin ---");
+      if (extBundle) console.log(extBundle.trimEnd());
+      console.log("--- EXT bundle end ---");
+      console.log("--- REST bundle begin ---");
+      console.log(restBundle.trimEnd());
+      console.log("--- REST bundle end ---");
+      console.log("(no file written)");
+      return;
+    }
+
+    writeFileAtomic(migrationPath, nextSql);
+    console.log(
+      `prisma-partials: wrote EXT at head (${extHash || "none"}), and ${
+        willReplace ? "updated REST" : "appended REST"
+      } (${restHash || "none"}) to ${migrationPath}`,
+    );
+  } else {
+    if (DRY_RUN)
+      console.log(
+        "[DRY-RUN] prisma-partials would write only EXT block at head (REST none).",
+      );
+    else
+      console.log(
+        `prisma-partials: wrote only EXT block at head (${extHash}) to ${migrationPath}`,
+      );
+  }
 }
 
 try {

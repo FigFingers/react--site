@@ -87,8 +87,6 @@ model Clip {
   createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
-  /// @raw.sql ALTER TABLE "public"."clips"
-  ///   ADD COLUMN "duration_ms" int GENERATED ALWAYS AS (end_ms - start_ms) STORED NOT NULL;
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
@@ -136,6 +134,7 @@ model ClipPlaylist {
   clipId     Int      @map("clip_id")
   playlistId Int      @map("playlist_id")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
   playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
@@ -234,7 +233,6 @@ model VerificationToken {
 /// @raw.sql ALTER TABLE "public"."clips"
 ///   ADD CONSTRAINT clips_time_ck CHECK (start_ms >= 0 AND end_ms > start_ms);
 
-/// @raw.sql CREATE EXTENSION IF NOT EXISTS pg_trgm;
-/// CREATE INDEX clips_title_trgm_gin
+/// @raw.sql CREATE INDEX IF NOT EXISTS clips_title_trgm_gin
 ///   ON  "public"."clips" USING GIN (title gin_trgm_ops)
 ///   WHERE deleted_at IS NULL;

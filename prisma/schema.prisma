@@ -14,16 +14,39 @@ datasource db {
 }
 
 model Clip {
-  id        Int      @id @default(autoincrement()) // 自動採番の主キー
-  clipName  String? //クリップ名
-  user      String // ユーザー名
-  service   String // Netflix, Primeなど
-  startTime Float // 開始時刻
-  endTime   Float // 終了時刻
-  url       String // 動画URLやパス
-  title     String // 動画タイトル
-  epnumber  String   @default("エピソード不明") // エピソード名や番号
-  createdAt DateTime @default(now()) // 登録日時
+  id            Int            @id @default(autoincrement()) // 自動採番の主キー
+  clipName      String? //クリップ名
+  user          String // ユーザー名
+  service       String // Netflix, Primeなど
+  startTime     Float // 開始時刻
+  endTime       Float // 終了時刻
+  url           String // 動画URLやパス
+  title         String // 動画タイトル
+  epnumber      String         @default("エピソード不明") // エピソード名や番号
+  createdAt     DateTime       @default(now()) // 登録日時
+  playlistClips PlaylistClip[]
+}
+
+model Playlist {
+  id        Int            @id @default(autoincrement())
+  name      String
+  user      User           @relation(fields: [userId], references: [id])
+  userId    String
+  clips     PlaylistClip[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model PlaylistClip {
+  id         Int      @id @default(autoincrement())
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  playlistId Int
+  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  clipId     Int
+  order      Int
+
+  @@unique([playlistId, clipId])
+  @@index([playlistId, order])
 }
 
 model User {
@@ -41,6 +64,8 @@ model User {
   updatedAt     DateTime  @updatedAt
   accounts      Account[]
   sessions      Session[]
+
+  playlists Playlist[]
 }
 
 model Account {

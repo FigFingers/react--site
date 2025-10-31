@@ -1,56 +1,68 @@
-function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endtime}) {
-    // Link 生成
-    let urlLink;
-    switch (icon) {
-      case "Netflix":
-        urlLink = "https://www.netflix.com"+url;
-        break;
-      case "prime":
-        urlLink = "https://www.amazon.co.jp/primevideo"+url;//暫定なので気にしないで
-        break;
-      default:
-        urlLink = null; // Handle unknown cases
-    }
-    //クリック時の処理
-    const handleClick = () =>{
-    // Cookie関係: name, username, starttime, endtime を設定
+"use client";
+
+import { useState } from "react";
+import PlaylistCreateModal from "@/app/base/_components/PlaylistModal";
+
+function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endtime , userId, Id}) {
+  let urlLink;
+  switch (icon) {
+    case "Netflix":
+      urlLink = "https://www.netflix.com" + url;
+      break;
+    case "prime":
+      urlLink = "https://www.amazon.co.jp/primevideo" + url;
+      break;
+    default:
+      urlLink = null;
+  }
+
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleClick = () => {
     document.cookie = `name=${encodeURIComponent(name)}; path=/; max-age=3600; secure; samesite=lax`;
     document.cookie = `title=${encodeURIComponent(title)}; path=/; max-age=3600; secure; samesite=lax`;
     document.cookie = `username=${encodeURIComponent(username)}; path=/; max-age=3600; secure; samesite=lax`;
     document.cookie = `starttime=${encodeURIComponent(starttime)}; path=/; max-age=3600; secure`;
     document.cookie = `endtime=${encodeURIComponent(endtime)}; path=/; max-age=3600; secure`;
     document.cookie = `url=${encodeURIComponent(url)}; path=/; max-age=3600; secure`;
-    // Cookie設定確認用（必要なら削除）
-    console.log("Cookie設定: ", document.cookie);    
-    //カスタムイベント発火
+
     const event = new CustomEvent("clipSelected", {
       detail: { name, username, starttime, endtime },
     });
     window.dispatchEvent(event);
 
-      //リンクを開く処理
-      if (urlLink) {
-        //ここで拡張機能に、既に開いているnetflixタブがあるか確認してもらう その為の値を渡す
-        console.log("open URL");
-        // 実際にリンクを開く処理　t=時間で再生可能時間を指定できる。
-        window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");
-        console.log("open URL now");
-      } else {
-        alert("Invalid link or unknown service");//eroorリンクへの変更
-      }
-  
+    if (urlLink) {
+      window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");
+    } else {
+      alert("Invalid link or unknown service");
     }
-  
-    return (
-      <div className="list-item"  data-starttime={starttime} data-endtime={endtime}>
-        <p>
-          {name} — {title} {epnum} — {username}{" "}
-          <button className="clipedbutton" onClick={handleClick}>
-            {icon}
-          </button>{" "}
-          {rating} +
-        </p>
-      </div>
-    );
+  };
+
+  return (
+    <div className="list-item" data-starttime={starttime} data-endtime={endtime}>
+      <p>
+        {name} — {title} {epnum} — {username}{" "}
+        <button className="clipedbutton" onClick={handleClick}>
+          {icon}
+        </button>{" "}
+        {rating}
+
+        {/* YouTubeみたいに clip の横に + */}
+        <button
+          onClick={() => setIsOpen(true)}
+          className="ml-2 px-2 py-1 bg-gray-700 text-white rounded hover:bg-gray-600 transition"
+        >
+          ＋
+        </button>
+      </p>
+        <PlaylistCreateModal
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+          userId={userId} 
+          clipId={Id}
+        />
+    </div>
+  );
 }
+
 export default Clip;

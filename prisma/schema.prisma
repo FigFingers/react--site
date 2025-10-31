@@ -39,15 +39,16 @@ model Playlist {
 
 model PlaylistClip {
   id         Int      @id @default(autoincrement())
-  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   playlistId Int
-  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
   clipId     Int
-  order      Int
+  order      Int       // 並び順
 
-  @@unique([playlistId, clipId])
+  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
   @@index([playlistId, order])
 }
+
 
 model User {
   id    String  @id @default(cuid())

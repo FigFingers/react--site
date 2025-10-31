@@ -1,3 +1,4 @@
+"use client";
 import React, { useState ,useEffect} from "react";
 function PlayList({ title, epnum , mylistname, username ,icon,data}){
     let imageSrc;

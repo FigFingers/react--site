@@ -1,3 +1,4 @@
+//不要ファイルっぽい
 import React, { useState ,useEffect} from "react";
 function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endtime}) {
     // Link 生成

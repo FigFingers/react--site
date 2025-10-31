@@ -9,7 +9,6 @@ export default function app() {
 
 <div className="main-content">
 
-  <ClipList clipApiUrl={process.env.NEXT_PUBLIC_API_URL} />
   <PlayList PlayList_Data_Url="/test_data/mylist.json"/>
 </div>
 </>

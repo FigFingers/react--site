@@ -3,10 +3,12 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 import { prisma } from "@/lib/prisma";
-import PlaylistView from "./PlaylistView";
+import { auth } from "@/auth";
+// ✅ dynamic import やめる
+import PlaylistView from "./PlaylistView.client"; 
 
-export default async function PlaylistPage(props: { params: Promise<{ playlistId: string }> }) {
-  const { playlistId } = await props.params;
+export default async function PlaylistPage({ params }) {
+  const { playlistId } = await params;
 
   const playlist = await prisma.playlist.findUnique({
     where: { id: Number(playlistId) },
@@ -20,14 +22,15 @@ export default async function PlaylistPage(props: { params: Promise<{ playlistId
 
   if (!playlist) return <div>Not Found</div>;
 
-  // ✅ Hydration差異防止。Date → string などに統一
   const serialized = JSON.parse(JSON.stringify(playlist));
+  const session = await auth();
+  const userId = session?.user?.id ?? null;
 
   return (
     <div className="p-6">
       <h1 className="text-xl font-semibold mb-4">{serialized.name}</h1>
-      {/* ✅ serialized を渡す */}
-      <PlaylistView playlist={serialized} />
+      {/* ✅ これで PlaylistView 以下は完全に Client-only */}
+      <PlaylistView playlist={serialized} userId={userId} />
     </div>
   );
 }

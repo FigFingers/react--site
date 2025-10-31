@@ -1,9 +1,10 @@
+// src/app/base/clip/clipData.js
 "use client";
 
 import { useState } from "react";
 import PlaylistCreateModal from "@/app/base/_components/PlaylistModal";
 
-function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endtime , userId, Id}) {
+function Clip({ name, title, epnum, username, icon,  url ,starttime, endtime , userId, Id}) {
   let urlLink;
   switch (icon) {
     case "Netflix":
@@ -45,7 +46,6 @@ function Clip({ name, title, epnum, username, icon, rating, url ,starttime, endt
         <button className="clipedbutton" onClick={handleClick}>
           {icon}
         </button>{" "}
-        {rating}
 
         {/* YouTubeみたいに clip の横に + */}
         <button

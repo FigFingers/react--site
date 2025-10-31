@@ -1,53 +1,60 @@
+// src/app/(site_data)/(protected)/playlists/[playlistId]/SortableClipItem.tsx
 "use client";
 
+import { memo, useMemo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import Clip from "@/app/base/clip/clipData";
 
-type SortableClipItemProps = {
+interface ClipData {
+  id: number;
+  title: string;
+  clipName: string;
+  user: string;
+  service: string;
+  startTime: number;
+  endTime: number;
+  url: string;
+  epnumber: string;
+}
+
+interface Props {
   playlistClipId: number;
-  playlistId: number;
-  order: number;
-  clip: {
-    id: number;
-    title: string;
-    clipName: string;
-    user: string;
-    service: string;
-    startTime: number;
-    endTime: number;
-    url: string;
-    epnumber: string;
-    createdAt: Date;
-  };
-};
+  clip: ClipData;
+  userId: string | null;
+}
 
-export default function SortableClipItem({
-  playlistClipId,
-  playlistId,
-  order,
-  clip,
-}: SortableClipItemProps) {
-
+function SortableClipItem({ playlistClipId, clip, userId }: Props) {
   const { attributes, listeners, setNodeRef, transform, transition } =
     useSortable({ id: playlistClipId });
 
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
+  // ✅ style オブジェクトを useMemo 化（レンダリング安定）
+  const style = useMemo(
+    () => ({
+      transform: CSS.Transform.toString(transform),
+      transition,
+      touchAction: "none", // ← スクロール干渉防止（UX向上）
+    }),
+    [transform, transition]
+  );
 
   return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      className="border rounded p-2 bg-white shadow-sm"
-    >
-      <div className="flex justify-between">
-        <span>{clip.clipName} {clip.title}</span> 
-        <b><span className="text-gray-500 text-sm">#{order}</span></b>
-      </div>
+    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+      <Clip
+        name={clip.clipName || "切り抜き"}
+        title={clip.title || "タイトルがありません"}
+        epnum={clip.epnumber || ""}
+        url={clip.url || "/browse"}
+        username={clip.user || "名無し"}
+        icon={clip.service || "unknown"}
+        userId={userId}
+        starttime={clip.startTime}
+        endtime={clip.endTime}
+        Id={clip.id}
+      />
     </div>
   );
 }
+
+// ✅ DnD時以外の無駄な再描画を完全ブロック
+export default memo(SortableClipItem);

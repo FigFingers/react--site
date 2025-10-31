@@ -1,3 +1,4 @@
+// src/app/base/clip/clipCluster.js
 "use client";
 import React, { useState ,useEffect} from "react";
 import Clip from '@/app/base/clip/clipData';

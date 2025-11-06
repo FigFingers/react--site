@@ -12,7 +12,7 @@ export default async function app() {
   return (
     <>
       <ClipList clipApiUrl="/api/random10" userId={userId} />
-      <PlayList PlayList_Data_Url="/test_data/mylist.json" />
+      <PlayList PlayList_Data_Url="/api/playlists/all/client"  />
     </>
   );
 }

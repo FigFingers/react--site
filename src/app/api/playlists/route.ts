@@ -1,5 +1,4 @@
 // src/app/api/playlists/route.ts
-// src/app/api/playlists/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth"; // ← v5 ではこれだけでOK

@@ -1,12 +1,12 @@
-// src/app/api/playlists/%5BuserId%5D/route.ts
+// src/app/api/playlists/user/[userId]/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: Request,
-  { params }: { params: { userId: string } }
+  context: { params: Promise<{ userId: string }> }
 ) {
-  const { userId } = params; // ← ここが重要
+  const { userId } = await context.params; // ✅ awaitを追加
 
   const playlists = await prisma.playlist.findMany({
     where: { userId },

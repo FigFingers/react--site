@@ -15,13 +15,9 @@ function PlayList({ title, epnum , mylistname, username ,icon,data}){
     }
     const router = useRouter()
     const handleClick = () =>{
-      // cookie関係　starttime endtime拡張機能側への受け渡し
-      let cookiedata = `title=${title}; data= ${data};`;
-      console.log(cookiedata);
-      console.log("この値をCookieに書き込みたい！");
       router.push(`/playlists/${data}`); 
-  
     };
+
     return(
      
     <div className="grid-item">
@@ -41,7 +37,7 @@ export default function PlayListCluster({ PlayList_Data_Url }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
-  
+
     useEffect(() => {
       const fetchData = async () => {
         setLoading(true);
@@ -68,6 +64,9 @@ export default function PlayListCluster({ PlayList_Data_Url }) {
     if (error) {
       return <p>Error: {error}</p>;
     }
+
+    console.log("[PlayList] FETCH URL:", PlayList_Data_Url);
+
     return(
       <section className="content-grid">
         {data && data.allReceivedData ? (

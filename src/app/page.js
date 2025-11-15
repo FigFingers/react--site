@@ -11,7 +11,7 @@ export default async function app() {
 
   return (
     <>
-      <ClipList clipApiUrl="/api/random10" userId={userId} />
+      <ClipList clipApiUrl="/api/clips/chunk" userId={userId} />
       <PlayList PlayList_Data_Url="/api/playlists/all/client"  />
     </>
   );

@@ -1,62 +1,88 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const CHUNK_SIZE = 100;
+
 export async function GET(req: NextRequest): Promise<Response> {
+  
   const { searchParams } = new URL(req.url);
-  const keyword: string = searchParams.get("q") ?? "";
-  const user: string = searchParams.get("user") ?? "";
+
+  const keyword = searchParams.get("q") ?? "";
+  const user = searchParams.get("user") ?? "";
+  const cursorParam = searchParams.get("cursor");
+
+  // cursor は number 型
+  const cursor = cursorParam ? Number(cursorParam) : null;
+
+  console.log("cursorParam:", cursorParam);
+　console.log("parsed cursor:", cursor);
 
   try {
-    // 完全一致検索
-    const exactMatch = await prisma.clip.findMany({
-      where: {
-        title: keyword,
-        ...(user && { user }),
+    // ================
+    // where 条件
+    // ================
+    const whereClause: any = {
+      title: {
+        contains: keyword,
       },
-      orderBy: { id: "desc" },
+      ...(user && { user }),
+    };
+
+    // ================
+    // cursor ページング検索
+    // ================
+    const items = await prisma.clip.findMany({
+      take: CHUNK_SIZE + 1,
+      ...(cursor
+        ? {
+            cursor: { id: cursor },
+            skip: 1,
+          }
+        : {}),
+      where: whereClause,
+      orderBy: { id: "desc" }, // 安定順序
     });
 
-    // 部分一致検索（完全一致は除外）
-    const partialMatches = await prisma.clip.findMany({
-      where: {
-        title: {
-          contains: keyword,
-        },
-        ...(user && { user }),
-        NOT: {
-          title: keyword,
-        },
-      },
-    });
+    // nextCursor 判定
+    let nextCursor: number | null = null;
 
-    // タイトル長の差で簡易スコアリング
-    const sortedPartial = partialMatches.sort((a, b) => {
+    if (items.length > CHUNK_SIZE) {
+      const extra = items.pop(); // 次page用
+      nextCursor = extra!.id;
+    }
+
+    // =====================
+    // relevance（軽いスコア調整）
+    // =====================
+    const scored = items.sort((a, b) => {
       const dist = (t: { title: string }) =>
         Math.abs(t.title.length - keyword.length);
       return dist(a) - dist(b);
     });
 
-    const results = [...exactMatch, ...sortedPartial].slice(0, 30);
-
-    return new Response(JSON.stringify({ allReceivedData: results }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
-  } catch (error) {
-    console.error(
-      "検索エラー:",
-      error instanceof Error ? error.message : String(error)
+    return new Response(
+      JSON.stringify({
+        items: scored,   // clipCluster と完全互換
+        nextCursor,      // search も続きが読める
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
     );
-
-    return new Response(JSON.stringify({ error: "検索に失敗しました" }), {
-      status: 500,
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
+  } catch (error) {
+    console.error("検索エラー:", error);
+    return new Response(
+      JSON.stringify({ error: "検索に失敗しました" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }

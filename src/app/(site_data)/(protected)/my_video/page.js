@@ -1,12 +1,17 @@
-"use client";
-import '@/app/globals.css';
-import ClipList from '@/app/base/clip/clipCluster';
+"use server";
 
+import { auth } from "@/auth"; // ← これを使う
 
-export default function app() {
+import ClipList from "@/app/base/clip/clipCluster";
+
+export default async function app() {
+  const session = await auth(); // ← これだけでOK
+  const userId = session?.user?.id ?? null;
+
   return (
-<>
-  <ClipList clipApiUrl="http://localhost:3000/api/search?user=yabuki" />
-  {/* 後ほどsearchでのuserID完全一致に書き換え */}
-</>
-);}
+    <>
+<ClipList clipApiUrl="api/search?user=yabuki"  userId={userId} />
+
+    </>
+  );
+}

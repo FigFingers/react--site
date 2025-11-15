@@ -1,7 +1,9 @@
+// src/app/base/clip/clipCluster.js
+"use client";
 import React, { useState ,useEffect} from "react";
 import Clip from '@/app/base/clip/clipData';
 
-export default function ClipList({ clipApiUrl }) {
+export default function ClipList({ clipApiUrl , userId }) {
     const [data, setData] = useState(null);
     const [error, setError] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -72,6 +74,8 @@ export default function ClipList({ clipApiUrl }) {
               icon={item.service || "unknown"}
               starttime={item.startTime}
               endtime={item.endTime}
+              userId={userId} // ここで userId を渡す
+              Id={item.id}
             />
           ))
         ) : (

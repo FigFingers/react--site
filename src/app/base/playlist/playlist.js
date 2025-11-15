@@ -1,4 +1,6 @@
+"use client";
 import React, { useState ,useEffect} from "react";
+import { useRouter } from "next/navigation";
 function PlayList({ title, epnum , mylistname, username ,icon,data}){
     let imageSrc;
     switch(icon){
@@ -11,11 +13,13 @@ function PlayList({ title, epnum , mylistname, username ,icon,data}){
       default:
         imageSrc ="Unknown";
     }
+    const router = useRouter()
     const handleClick = () =>{
       // cookie関係　starttime endtime拡張機能側への受け渡し
       let cookiedata = `title=${title}; data= ${data};`;
       console.log(cookiedata);
-      alert("この値をCookieに書き込みたい！");
+      console.log("この値をCookieに書き込みたい！");
+      router.push(`/playlists/${data}`); 
   
     };
     return(

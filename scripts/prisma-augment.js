@@ -17,7 +17,7 @@ const SCHEMA = path.resolve("prisma/schema.prisma");
 const MIGRATIONS_DIR = path.resolve("prisma/migrations");
 
 const DEFAULT_SCHEMA = "public";
-const ORDER = ["partialIndex", "partialUnique", "raw"]; // 出力順
+const ORDER = ["partialIndex", "partialUnique", "raw"]; // DROP はあとで dropStmts として allNews = [...news, ...dropStmts] に足されるため不記載
 
 const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
 
@@ -207,20 +207,89 @@ function loadHistoricalKeys() {
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const re of blockRes) {
-      let m;
-      while (true) {
-        m = re.exec(txt);
-        if (m === null) break;
+    for (const baseRe of blockRes) {
+      const re = new RegExp(baseRe.source, baseRe.flags);
+      let m = re.exec(txt);
+      while (m !== null) {
         const body = m[1] || "";
         const stmts = splitStatements(body).filter(Boolean);
         for (const st of stmts) {
           keys.add(hashForStatement(st));
         }
+        m = re.exec(txt);
       }
     }
   }
   return keys;
+}
+
+function loadHistoricalActiveCreateHashes() {
+  // 「現在時点で生きている CREATE INDEX / UNIQUE INDEX」のハッシュ集合
+  const activeByIndex = new Map(); // indexName -> hash
+  const activeHashes = new Set();
+
+  if (!fs.existsSync(MIGRATIONS_DIR)) return activeHashes;
+
+  const dirs = fs
+    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort(); // ここで時系列順になる
+
+  const blockRes = [
+    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+  ];
+
+  for (const d of dirs) {
+    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
+    if (!fs.existsSync(p)) continue;
+    const txt = fs.readFileSync(p, "utf8");
+
+    for (const baseRe of blockRes) {
+      const re = new RegExp(baseRe.source, baseRe.flags);
+      let m = re.exec(txt);
+      while (m !== null) {
+        const body = m[1] || "";
+        const stmts = splitStatements(body).filter(Boolean);
+
+        for (const raw of stmts) {
+          const stmt = normalizeTerminator(raw).trim();
+          const stripped = stmt.replace(/--.*$/gm, "").trim();
+          if (!stripped) continue;
+
+          // CREATE INDEX / CREATE UNIQUE INDEX
+          if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) {
+            const h = hashForStatement(stmt);
+            const mm = stripped.match(
+              /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
+            );
+            if (!mm) continue;
+            const indexName = mm[3] || `"${mm[4]}"`;
+
+            activeByIndex.set(indexName, h);
+            continue;
+          }
+
+          // DROP INDEX IF EXISTS indexName
+          const dropMatch = stripped.match(
+            /^\s*DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("?([\w]+)"?)/i,
+          );
+          if (dropMatch) {
+            const indexName = dropMatch[2] || `"${dropMatch[3]}"`;
+            activeByIndex.delete(indexName);
+          }
+        }
+        m = re.exec(txt);
+      }
+    }
+  }
+
+  for (const h of activeByIndex.values()) {
+    activeHashes.add(h);
+  }
+  return activeHashes;
 }
 
 function loadHistoricalCreates() {
@@ -246,7 +315,8 @@ function loadHistoricalCreates() {
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const re of blockRes) {
+    for (const baseRe of blockRes) {
+      const re = new RegExp(baseRe.source, baseRe.flags);
       let m = re.exec(txt);
       while (m !== null) {
         const body = m[1] || "";
@@ -615,6 +685,7 @@ function main() {
 
   // 5) 履歴ハッシュを収集
   const histKeys = loadHistoricalKeys();
+  const histActiveCreateHashes = loadHistoricalActiveCreateHashes();
 
   if (DEBUG) {
     console.log("[DEBUG] histKeys count =", histKeys.size);
@@ -644,18 +715,19 @@ function main() {
   // 5.3) 「以前はあったが、今回 schema からは出てこない CREATE INDEX」→ DROP を作る
   const dropStmts = [];
   for (const [h, rec] of histCreates) {
+    // 「今の履歴上、まだ生きているインデックス」だけ DROP 対象にする
+    if (!histActiveCreateHashes.has(h)) continue;
     // まだ schema に存在するものは DROP 対象ではない
     if (currentCreateHashes.has(h)) continue;
 
     const dropSql = `DROP INDEX IF EXISTS ${rec.indexName};`;
     const dropHash = hashForStatement(dropSql);
 
-    // すでに過去の GENERATED_* ブロックで DROP 済み or 今回ラン内で重複ならスキップ
-    if (histKeys.has(dropHash)) continue;
+    // 同一ラン内だけ重複排除すれば十分（履歴の DROP は無視する）
     if (seenThisRun.has(dropHash)) continue;
 
     dropStmts.push({
-      kind: "raw", // REST 側に載せるので raw 扱い
+      kind: "drop",
       stmt: dropSql,
       hash: dropHash,
     });
@@ -675,7 +747,15 @@ function main() {
   }
 
   // 5.4) 「今回 CREATE すべき新規」 + 「今回 DROP すべき分」をまとめる
-  const news = dedupedThisRun.filter((x) => !histKeys.has(x.hash));
+  const news = dedupedThisRun.filter((x) => {
+    const isCreateIndex = /^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(x.stmt);
+    if (isCreateIndex) {
+      // CREATE INDEX / UNIQUE INDEX は「まだ生きているもの」とだけ比較
+      return !histActiveCreateHashes.has(x.hash);
+    }
+    // それ以外（RAW, EXTENSION など）は従来どおり全履歴と比較
+    return !histKeys.has(x.hash);
+  });
   const allNews = [...news, ...dropStmts];
 
   if (DEBUG) {
@@ -719,7 +799,7 @@ function main() {
         REST_MARK,
         restHash,
         bundleBodyRest,
-        "partialIndex/partialUnique/raw",
+        "partialIndex/partialUnique/raw/drop",
       )
     : "";
 

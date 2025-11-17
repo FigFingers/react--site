@@ -21,6 +21,8 @@ const ORDER = ["partialIndex", "partialUnique", "raw"]; // 出力順
 
 const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
 
+const DEBUG = process.env.DEBUG_PARTIALS === "1";
+
 const EXT_MARK = "GENERATED_EXTENSIONS";
 const REST_MARK = "GENERATED_AUGMENT";
 
@@ -219,6 +221,77 @@ function loadHistoricalKeys() {
     }
   }
   return keys;
+}
+
+function loadHistoricalCreates() {
+  // hashForStatement(sql) -> { stmt, indexName }
+  const creates = new Map();
+
+  if (!fs.existsSync(MIGRATIONS_DIR)) return creates;
+
+  const dirs = fs
+    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+
+  const blockRes = [
+    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+  ];
+
+  for (const d of dirs) {
+    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
+    if (!fs.existsSync(p)) continue;
+    const txt = fs.readFileSync(p, "utf8");
+
+    for (const re of blockRes) {
+      let m = re.exec(txt);
+      while (m !== null) {
+        const body = m[1] || "";
+        const stmts = splitStatements(body).filter(Boolean);
+
+        for (const raw of stmts) {
+          const stmt = normalizeTerminator(raw).trim();
+
+          // コメントを全部落とした版（kind コメントが先頭に来ても大丈夫にする）
+          const stripped = stmt.replace(/--.*$/gm, "").trim();
+          if (!stripped) continue;
+
+          // CREATE [UNIQUE] INDEX ... のみ対象
+          if (!/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) continue;
+
+          const h = hashForStatement(stmt); // ハッシュは元の stmt（コメント込み）でも stripped でもどちらでもよいが、hashForStatement 内でコメントは消しているのでどちらでも同じになる
+
+          // インデックス名を取り出す
+          const mm = stripped.match(
+            /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
+          );
+          if (!mm) continue;
+
+          const indexName = mm[3] || `"${mm[4]}"`;
+          creates.set(h, { stmt, indexName });
+
+          if (DEBUG) {
+            console.log("[DEBUG] hist CREATE:", {
+              hash: h,
+              indexName,
+              stmt,
+              migration: d,
+            });
+          }
+        }
+        m = re.exec(txt);
+      }
+    }
+  }
+
+  if (DEBUG) {
+    console.log("[DEBUG] loadHistoricalCreates: total =", creates.size);
+  }
+
+  return creates;
 }
 
 // ========== 追加のヘルパ ==========
@@ -529,13 +602,95 @@ function main() {
     dedupedThisRun.push({ ...x, hash: h });
   }
 
-  // 5) 履歴ハッシュを収集して差分だけ残す
+  if (DEBUG) {
+    console.log("[DEBUG] dedupedThisRun count =", dedupedThisRun.length);
+    for (const x of dedupedThisRun) {
+      console.log("[DEBUG] deduped stmt:", {
+        kind: x.kind,
+        hash: x.hash,
+        stmt: x.stmt,
+      });
+    }
+  }
+
+  // 5) 履歴ハッシュを収集
   const histKeys = loadHistoricalKeys();
+
+  if (DEBUG) {
+    console.log("[DEBUG] histKeys count =", histKeys.size);
+  }
+
+  // 5.1) これまで GENERATED_* ブロックで生成した CREATE INDEX 群を取得
+  const histCreates = loadHistoricalCreates();
+
+  // 5.2) 今回 schema から生成された CREATE INDEX 群のハッシュ集合
+  const currentCreateHashes = new Set(
+    dedupedThisRun
+      .filter((x) => /^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(x.stmt))
+      .map((x) => x.hash),
+  );
+
+  if (DEBUG) {
+    console.log(
+      "[DEBUG] currentCreateHashes count =",
+      currentCreateHashes.size,
+    );
+    console.log(
+      "[DEBUG] currentCreateHashes =",
+      Array.from(currentCreateHashes),
+    );
+  }
+
+  // 5.3) 「以前はあったが、今回 schema からは出てこない CREATE INDEX」→ DROP を作る
+  const dropStmts = [];
+  for (const [h, rec] of histCreates) {
+    // まだ schema に存在するものは DROP 対象ではない
+    if (currentCreateHashes.has(h)) continue;
+
+    const dropSql = `DROP INDEX IF EXISTS ${rec.indexName};`;
+    const dropHash = hashForStatement(dropSql);
+
+    // すでに過去の GENERATED_* ブロックで DROP 済み or 今回ラン内で重複ならスキップ
+    if (histKeys.has(dropHash)) continue;
+    if (seenThisRun.has(dropHash)) continue;
+
+    dropStmts.push({
+      kind: "raw", // REST 側に載せるので raw 扱い
+      stmt: dropSql,
+      hash: dropHash,
+    });
+    seenThisRun.add(dropHash);
+
+    if (DEBUG) {
+      console.log("[DEBUG] generated DROP:", {
+        hash: dropHash,
+        stmt: dropSql,
+        fromHash: h,
+        indexName: rec.indexName,
+      });
+    }
+  }
+  if (DEBUG) {
+    console.log("[DEBUG] dropStmts count =", dropStmts.length);
+  }
+
+  // 5.4) 「今回 CREATE すべき新規」 + 「今回 DROP すべき分」をまとめる
   const news = dedupedThisRun.filter((x) => !histKeys.has(x.hash));
+  const allNews = [...news, ...dropStmts];
+
+  if (DEBUG) {
+    console.log("[DEBUG] news count =", news.length);
+    console.log("[DEBUG] allNews count =", allNews.length);
+  }
 
   // 6) EXT と REST に分割
-  const newsExt = news.filter((x) => isCreateExtension(x.stmt));
-  const newsRest = news.filter((x) => !isCreateExtension(x.stmt));
+  const newsExt = allNews.filter((x) => isCreateExtension(x.stmt));
+  const newsRest = allNews.filter((x) => !isCreateExtension(x.stmt));
+
+  if (DEBUG) {
+    console.log("[DEBUG] newsExt count =", newsExt.length);
+    console.log("[DEBUG] newsRest count =", newsRest.length);
+  }
 
   const bundleBodyExt = newsExt
     .map((x) => `-- kind: ${x.kind}\n${x.stmt}`)

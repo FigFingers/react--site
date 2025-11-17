@@ -7,6 +7,7 @@
 // - 同一 migration 内の DROP/ADD 衝突を自動回避
 //
 // biome-ignore-all lint/suspicious/noConsole: cli script
+// biome-ignore-all lint/security/noSecrets: not exist SecretStrings
 
 const fs = require("node:fs");
 const path = require("node:path");

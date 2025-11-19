@@ -3,7 +3,6 @@
 // 生成SQLを「過去生成分との差分のみ」最新 migration.sql に追記（または置換）する。
 // - ドライラン: `--check` か環境変数 `DRY_RUN=1`
 // - 履歴重複排除: 過去の GENERATED_(EXTENSIONS|AUGMENT|PARTIALS) ブロックから既出SQLを収集
-// - 定義ベースのデデュープ: テーブル/列順/WHERE/UNIQUE が一致すれば、インデックス名が違っても重複扱い
 // - 同一 migration 内の DROP/ADD 衝突を自動回避
 //
 // biome-ignore-all lint/suspicious/noConsole: cli script
@@ -593,7 +592,7 @@ function extractDeclarativePartialIndexes(schemaText, modelMap) {
           : null;
 
     const colList = cols.map((c) => `"${c}"`).join(",");
-    const sql = `CREATE INDEX IF NOT EXISTS ${name}
+    const sql = `CREATE INDEX ${name}
   ON "${schema}"."${table}"(${colList})${where ? `\n  WHERE ${where}` : ""};`;
 
     blocks.push({ kind: "partialIndex", sql });
@@ -647,7 +646,7 @@ function extractDeclarativePartialUniques(schemaText, modelMap) {
           : null;
 
     const colList = cols.map((c) => `"${c}"`).join(",");
-    const sql = `CREATE UNIQUE INDEX IF NOT EXISTS ${name}
+    const sql = `CREATE UNIQUE INDEX ${name}
   ON "${schema}"."${table}"(${colList})${where ? `\n  WHERE ${where}` : ""};`;
 
     blocks.push({ kind: "partialUnique", sql });
@@ -852,7 +851,7 @@ function main() {
     // それ以外（RAW, EXTENSION など）は従来どおり全履歴と比較
     return !histKeys.has(x.hash);
   });
-  const allNews = [...news, ...dropStmts];
+  const allNews = [...dropStmts, ...news];
 
   if (DEBUG) {
     console.log("[DEBUG] news count =", news.length);

@@ -364,6 +364,68 @@ function loadHistoricalCreates() {
   return creates;
 }
 
+function loadHistoricalRawStatements() {
+  // GENERATED_* ブロックのうち -- kind: raw のものだけを @raw.sql 由来として拾う
+  // hashForStatement(sql) -> stmt
+  const raws = new Map();
+
+  if (!fs.existsSync(MIGRATIONS_DIR)) return raws;
+
+  const dirs = fs
+    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort();
+
+  const blockRes = [
+    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+  ];
+
+  for (const d of dirs) {
+    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
+    if (!fs.existsSync(p)) continue;
+    const txt = fs.readFileSync(p, "utf8");
+
+    for (const baseRe of blockRes) {
+      const re = new RegExp(baseRe.source, baseRe.flags);
+      let m = re.exec(txt);
+      while (m !== null) {
+        const body = m[1] || "";
+        const stmts = splitStatements(body).filter(Boolean);
+
+        for (const raw of stmts) {
+          const stmt = normalizeTerminator(raw).trim();
+          const stripped = stmt.replace(/--.*$/gm, "").trim();
+          if (!stripped) continue;
+
+          // 先頭行の kind コメントを見る
+          const kindMatch = stmt.match(/^\s*--\s*kind:\s*(\w+)/i);
+          const kind = kindMatch ? kindMatch[1].toLowerCase() : null;
+
+          if (kind !== "raw") continue;
+
+          const h = hashForStatement(stmt);
+          if (!raws.has(h)) {
+            raws.set(h, stmt);
+          }
+        }
+        m = re.exec(txt);
+      }
+    }
+  }
+
+  if (DEBUG) {
+    console.log(
+      "[DEBUG] loadHistoricalRawStatements(kind=raw): total =",
+      raws.size,
+    );
+  }
+
+  return raws;
+}
+
 // ========== 追加のヘルパ ==========
 function pickLatestMigrationDir() {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
@@ -709,6 +771,40 @@ function main() {
     console.log(
       "[DEBUG] currentCreateHashes =",
       Array.from(currentCreateHashes),
+    );
+  }
+
+  // 5.2.1) 今回 schema から生成された raw (@raw.sql) 群のハッシュ集合
+  const currentRawHashes = new Set(
+    dedupedThisRun.filter((x) => x.kind === "raw").map((x) => x.hash),
+  );
+
+  // 5.2.2) 過去の「@raw.sql 由来っぽい SQL」を取得
+  const histRawStmts = loadHistoricalRawStatements();
+
+  // 5.2.3) 過去にはあったが、今回 schema からは出てこない raw SQL を警告
+  const vanishedRaw = [];
+  for (const [h, stmt] of histRawStmts) {
+    if (!currentRawHashes.has(h)) {
+      vanishedRaw.push({ hash: h, stmt });
+    }
+  }
+
+  if (vanishedRaw.length > 0) {
+    const header = DRY_RUN
+      ? "[DRY-RUN] WARN: Some previously generated @raw.sql statements are no longer emitted from schema.prisma."
+      : "WARN: Some previously generated @raw.sql statements are no longer emitted from schema.prisma.";
+    console.warn(header);
+    for (const { stmt } of vanishedRaw.slice(0, 10)) {
+      // 長すぎる場合は少しだけ切って出す（お好みで）
+      const oneLine = stmt.replace(/\s+/g, " ").slice(0, 200);
+      console.warn(`  - ${oneLine}${oneLine.length === 200 ? " ..." : ""}`);
+    }
+    if (vanishedRaw.length > 10) {
+      console.warn(`  (and ${vanishedRaw.length - 10} more ...)`);
+    }
+    console.warn(
+      "  自動DROPは行われないので、必要であれば手動で逆操作のSQLを追加してください。",
     );
   }
 

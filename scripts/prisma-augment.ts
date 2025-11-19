@@ -8,25 +8,60 @@
 // biome-ignore-all lint/suspicious/noConsole: cli script
 // biome-ignore-all lint/security/noSecrets: not exist SecretStrings
 
-const fs = require("node:fs");
-const path = require("node:path");
-const crypto = require("node:crypto");
+import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
+import type { DMMF } from "@prisma/generator-helper";
+import { getDMMF } from "@prisma/internals";
 
 const SCHEMA = path.resolve("prisma/schema.prisma");
 const MIGRATIONS_DIR = path.resolve("prisma/migrations");
 
 const DEFAULT_SCHEMA = "public";
-const ORDER = ["partialIndex", "partialUnique", "raw"]; // DROP はあとで dropStmts として allNews = [...news, ...dropStmts] に足されるため不記載
+const ORDER = ["partialIndex", "partialUnique", "raw"] as const; // DROP はあとで dropStmts として allNews = [...news, ...dropStmts] に足されるため不記載
 
 const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
-
 const DEBUG = process.env.DEBUG_PARTIALS === "1";
 
 const EXT_MARK = "GENERATED_EXTENSIONS";
 const REST_MARK = "GENERATED_AUGMENT";
 
+type OrderBlockKind = (typeof ORDER)[number]; // "partialIndex" | "partialUnique" | "raw"
+type BlockKind = OrderBlockKind | "drop";
+
+interface PartialIndexOptions {
+  name?: string;
+  where?: string;
+  schema?: string;
+  unique?: boolean;
+}
+
+interface SqlBlock {
+  kind: BlockKind;
+  stmt: string;
+  hash: string;
+}
+
+interface ExtractedBlock {
+  kind: BlockKind;
+  sql: string;
+}
+
+interface ModelInfo {
+  name: string;
+  table: string;
+  fields: Record<string, string>;
+}
+
+type ModelMap = Record<string, ModelInfo>;
+
 // ========== 共通ユーティリティ ==========
-function makeBundle(mark, hash, body, label) {
+function makeBundle(
+  mark: string,
+  hash: string | undefined,
+  body: string,
+  label: string,
+): string {
   return (
     `\n-- ${mark}_BEGIN ${hash}\n` +
     `-- 以下は schema.prisma の注釈から自動生成されています (${label})\n` +
@@ -34,10 +69,12 @@ function makeBundle(mark, hash, body, label) {
     `\n-- ${mark}_END ${hash}\n`
   );
 }
-function readSchema() {
+
+function readSchema(): string {
   return fs.readFileSync(SCHEMA, "utf8");
 }
-function safeIdent(name) {
+
+function safeIdent(name?: string | null): string {
   return String(name || "")
     .trim()
     .replace(/[^a-zA-Z0-9_]/g, "_")
@@ -45,10 +82,12 @@ function safeIdent(name) {
     .replace(/^_+/, "")
     .slice(0, 63);
 }
-function splitTopLevel(s) {
-  const out = [];
+
+function splitTopLevel(ss: string | null | undefined): string[] {
+  const s = ss ?? "";
+  const out: string[] = [];
   let cur = "";
-  let q = null;
+  let q: string | null = null;
   for (let i = 0; i < (s || "").length; i++) {
     const ch = s[i];
     if (q) {
@@ -67,37 +106,44 @@ function splitTopLevel(s) {
   if (cur.trim()) out.push(cur.trim());
   return out;
 }
-function parseOptions(s) {
-  const opts = {};
-  if (!s) return opts;
-  for (const part of splitTopLevel(s)) {
-    const m = part.match(/^\s*(\w+)\s*[:=]\s*(.+)\s*$/); // name="x" も name: "x" も許容
+
+function parseOptions(s: string | null | undefined): PartialIndexOptions {
+  const txt = s ?? "";
+  const opts: Record<string, unknown> = {};
+
+  for (const part of splitTopLevel(txt)) {
+    const m = part.match(/^\s*(\w+)\s*[:=]\s*(.+)\s*$/);
     if (!m) continue;
-    const k = m[1];
-    let v = m[2].trim();
-    const q = v.match(/^(['"])(.*)\1$/);
-    if (q) v = q[2];
-    if (v === "true") v = true;
-    else if (v === "false") v = false;
-    opts[k] = v;
+
+    const key = m[1];
+    let val = m[2].trim();
+
+    const q = val.match(/^(['"])(.*)\1$/);
+    if (q) val = q[2];
+
+    if (val === "true") opts[key] = true;
+    else if (val === "false") opts[key] = false;
+    else opts[key] = val;
   }
-  return opts;
+  return opts as PartialIndexOptions;
 }
-function normalizeTerminator(sql) {
+
+function normalizeTerminator(sql: string): string {
   const t = String(sql || "").trim();
   if (/DO\s+\$\$[\s\S]*\$\$\s*;?\s*$/i.test(t))
     return t.replace(/\s*;?\s*$/, ";");
   return t.replace(/;?\s*$/, ";");
 }
-function normalizeForDedup(sql) {
+
+function normalizeForDedup(sql: string): string {
   return String(sql || "")
     .replace(/--.*$/gm, "")
     .replace(/\s+/g, " ")
     .replace(/\s*;\s*$/, ";")
     .trim();
 }
-function splitStatements(text) {
-  const out = [];
+function splitStatements(text: string): string[] {
+  const out: string[] = [];
   let buf = "";
   let inDollar = false;
   let i = 0;
@@ -139,55 +185,37 @@ function splitStatements(text) {
 }
 
 // ========== Prisma schema → 物理名マップ ==========
-function buildModelMap(schemaText) {
-  const lines = schemaText.split(/\r?\n/);
-  const models = {}; // { Model: { table, fields: { logical -> physical } } }
-  let cur = null;
+async function buildModelMap(schemaText: string): Promise<ModelMap> {
+  // Prisma の DMMF を取得
+  const dmmf: DMMF.Document = await getDMMF({ datamodel: schemaText });
 
-  for (const raw of lines) {
-    const line = raw.trimEnd();
+  const models: ModelMap = {};
 
-    const mStart = line.match(/^\s*model\s+(\w+)\s*\{/);
-    if (mStart) {
-      cur = { name: mStart[1], table: null, fields: {} };
-      models[cur.name] = cur;
-      continue;
-    }
-    if (!cur) continue;
+  for (const m of dmmf.datamodel.models) {
+    // @@map があれば dbName に入る。なければモデル名＝テーブル名
+    const table = m.dbName ?? m.name;
 
-    if (/^\s*\}/.test(line)) {
-      if (!cur.table) cur.table = cur.name;
-      cur = null;
-      continue;
+    const fields: Record<string, string> = {};
+
+    for (const f of m.fields) {
+      // @map があれば dbName に入る（Prisma 4 系〜）
+      // なければフィールド名そのまま
+      const col = f.dbName ?? f.name;
+      fields[f.name] = col;
     }
 
-    const tmap = line.match(/@@map\(\s*"([^"]+)"\s*\)/);
-    if (tmap) {
-      cur.table = tmap[1];
-      continue;
-    }
-
-    const fhead = line.match(/^\s*(\w+)\s+[^{\s][^\n]*$/);
-    if (
-      fhead &&
-      !line.trimStart().startsWith("@@") &&
-      !line.trimStart().startsWith("//")
-    ) {
-      const logical = fhead[1];
-      if (!Object.hasOwn(cur.fields, logical)) {
-        cur.fields[logical] = logical;
-      }
-      const mapm = line.match(/@map\(\s*"([^"]+)"\s*\)/);
-      if (mapm) {
-        cur.fields[logical] = mapm[1];
-      }
-    }
+    models[m.name] = {
+      name: m.name,
+      table,
+      fields,
+    };
   }
+
   return models;
 }
 
-function loadHistoricalKeys() {
-  const keys = new Set();
+function loadHistoricalKeys(): Set<string> {
+  const keys = new Set<string>();
   if (!fs.existsSync(MIGRATIONS_DIR)) return keys;
   const dirs = fs
     .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
@@ -222,10 +250,10 @@ function loadHistoricalKeys() {
   return keys;
 }
 
-function loadHistoricalActiveCreateHashes() {
+function loadHistoricalActiveCreateHashes(): Set<string> {
   // 「現在時点で生きている CREATE INDEX / UNIQUE INDEX」のハッシュ集合
   const activeByIndex = new Map(); // indexName -> hash
-  const activeHashes = new Set();
+  const activeHashes = new Set<string>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return activeHashes;
 
@@ -291,7 +319,10 @@ function loadHistoricalActiveCreateHashes() {
   return activeHashes;
 }
 
-function loadHistoricalCreates() {
+function loadHistoricalCreates(): Map<
+  string,
+  { stmt: string; indexName: string }
+> {
   // hashForStatement(sql) -> { stmt, indexName }
   const creates = new Map();
 
@@ -363,7 +394,7 @@ function loadHistoricalCreates() {
   return creates;
 }
 
-function loadHistoricalRawStatements() {
+function loadHistoricalRawStatements(): Map<string, string> {
   // GENERATED_* ブロックのうち -- kind: raw のものだけを @raw.sql 由来として拾う
   // hashForStatement(sql) -> stmt
   const raws = new Map();
@@ -426,7 +457,7 @@ function loadHistoricalRawStatements() {
 }
 
 // ========== 追加のヘルパ ==========
-function pickLatestMigrationDir() {
+function pickLatestMigrationDir(): string {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     throw new Error(
       "prisma/migrations がありません。先に `npx prisma migrate dev --create-only` を実行してください。",
@@ -441,11 +472,11 @@ function pickLatestMigrationDir() {
       "マイグレーションが存在しません。先に --create-only で作ってください。",
     );
 
-  const stamp = (s) => {
+  const stamp = (s: string) => {
     const m = s.match(/^(\d+)_/);
     return m ? Number(m[1]) : NaN;
   };
-  let latest = null,
+  let latest: string | null = null,
     best = -1;
   for (const d of dirs) {
     const st = stamp(d);
@@ -455,7 +486,7 @@ function pickLatestMigrationDir() {
     }
   }
   if (!latest) {
-    latest = dirs
+    const sorted = dirs
       .map((d) => {
         const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
         const stat = fs.existsSync(p)
@@ -463,24 +494,31 @@ function pickLatestMigrationDir() {
           : fs.statSync(path.join(MIGRATIONS_DIR, d));
         return { d, t: stat.mtimeMs };
       })
-      .sort((a, b) => a.t - b.t)
-      .pop().d;
+      .sort((a, b) => a.t - b.t);
+    const last = sorted[sorted.length - 1]; // ← undefined になる可能性は論理的に無い
+    latest = last.d;
   }
   return path.join(MIGRATIONS_DIR, latest);
 }
-function writeFileAtomic(filePath, content) {
+
+function writeFileAtomic(filePath: string, content: string): void {
   const tmp = `${filePath}.tmp`;
   fs.writeFileSync(tmp, content, "utf8");
   fs.renameSync(tmp, filePath);
 }
-function writeBlockAtTop(filePath, block, dryRun) {
+
+function writeBlockAtTop(
+  filePath: string,
+  block: string,
+  dryRun: boolean,
+): string {
   const txt = fs.readFileSync(filePath, "utf8");
   const beginReTop = new RegExp(
     `^-- ${EXT_MARK}_BEGIN [a-f0-9]{12}[\\s\\S]*?-- ${EXT_MARK}_END [a-f0-9]{12}\\s*\\n?`,
     "m",
   );
 
-  let next;
+  let next: string;
   if (beginReTop.test(txt)) {
     next = txt.replace(beginReTop, `${block}\n`);
   } else {
@@ -497,10 +535,12 @@ function writeBlockAtTop(filePath, block, dryRun) {
     return next;
   }
 }
-function isCreateExtension(stmt) {
+
+function isCreateExtension(stmt: string): boolean {
   return /^\s*CREATE\s+EXTENSION\b/i.test(stmt);
 }
-function hashForBundle(body) {
+
+function hashForBundle(body: string): string {
   return crypto
     .createHash("sha256")
     .update(normalizeForDedup(body))
@@ -508,7 +548,7 @@ function hashForBundle(body) {
     .slice(0, 12);
 }
 
-function hashForStatement(sql) {
+function hashForStatement(sql: string): string {
   return crypto
     .createHash("sha256")
     .update(normalizeForDedup(sql)) // コメント除去・空白正規化・末尾;統一
@@ -517,10 +557,13 @@ function hashForStatement(sql) {
 }
 
 // ========== 同一 migration 内の DROP/ADD 衝突回避 ==========
-function filterConflictsWithFile(stmts, migrationSql) {
+function filterConflictsWithFile(
+  stmts: SqlBlock[],
+  migrationSql: string,
+): SqlBlock[] {
   const drops = new Set();
   const dropRe = /ALTER\s+TABLE\s+"?([\w.]+)"?\s+DROP\s+COLUMN\s+"?([\w]+)"?/gi;
-  let m;
+  let m: RegExpExecArray | null;
   while (true) {
     m = dropRe.exec(migrationSql);
     if (m === null) break;
@@ -545,10 +588,13 @@ function filterConflictsWithFile(stmts, migrationSql) {
 }
 
 // ========== 抽出: @@partialIndex / @@partialUnique / @raw.sql ==========
-function extractDeclarativePartialIndexes(schemaText, modelMap) {
+function extractDeclarativePartialIndexes(
+  schemaText: string,
+  modelMap: ModelMap,
+): ExtractedBlock[] {
   const lines = schemaText.split(/\r?\n/);
-  const blocks = [];
-  let currentModel = null;
+  const blocks: ExtractedBlock[] = [];
+  let currentModel: string | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -599,10 +645,14 @@ function extractDeclarativePartialIndexes(schemaText, modelMap) {
   }
   return blocks;
 }
-function extractDeclarativePartialUniques(schemaText, modelMap) {
+
+function extractDeclarativePartialUniques(
+  schemaText: string,
+  modelMap: ModelMap,
+): ExtractedBlock[] {
   const lines = schemaText.split(/\r?\n/);
-  const blocks = [];
-  let currentModel = null;
+  const blocks: ExtractedBlock[] = [];
+  let currentModel: string | null = null;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -653,9 +703,10 @@ function extractDeclarativePartialUniques(schemaText, modelMap) {
   }
   return blocks;
 }
-function extractRawSqlBlocks(schemaText) {
+
+function extractRawSqlBlocks(schemaText: string): ExtractedBlock[] {
   const lines = schemaText.split(/\r?\n/);
-  const blocks = [];
+  const blocks: ExtractedBlock[] = [];
   const headRe = /^\s*\/\/\/\s*@raw\.sql\s*(.*)$/;
 
   for (let i = 0; i < lines.length; i++) {
@@ -680,9 +731,9 @@ function extractRawSqlBlocks(schemaText) {
 }
 
 // ========== メイン ==========
-function main() {
+async function main(): Promise<void> {
   const schema = readSchema();
-  const modelMap = buildModelMap(schema);
+  const modelMap = await buildModelMap(schema);
 
   // 1) 抽出
   const blocks = [
@@ -698,13 +749,14 @@ function main() {
   }
 
   // 2) kind順に展開
-  const expanded = [];
+  const expanded: SqlBlock[] = [];
   for (const k of ORDER) {
     for (const b of blocks.filter((x) => x.kind === k)) {
       const stmts = splitStatements(b.sql);
       for (const st of stmts) {
         if (!st) continue;
-        expanded.push({ kind: k, stmt: normalizeTerminator(st).trim() });
+        const stmt = normalizeTerminator(st).trim();
+        expanded.push({ kind: k, stmt, hash: hashForStatement(stmt) });
       }
     }
   }
@@ -724,7 +776,7 @@ function main() {
 
   // 4) 同一ラン内デデュープ（ハッシュ方式）
   const seenThisRun = new Set();
-  const dedupedThisRun = [];
+  const dedupedThisRun: SqlBlock[] = [];
   for (const x of expandedNoConflicts) {
     const h = hashForStatement(x.stmt);
     if (seenThisRun.has(h)) continue;
@@ -782,7 +834,7 @@ function main() {
   const histRawStmts = loadHistoricalRawStatements();
 
   // 5.2.3) 過去にはあったが、今回 schema からは出てこない raw SQL を警告
-  const vanishedRaw = [];
+  const vanishedRaw: { hash: string; stmt: string }[] = [];
   for (const [h, stmt] of histRawStmts) {
     if (!currentRawHashes.has(h)) {
       vanishedRaw.push({ hash: h, stmt });
@@ -808,7 +860,7 @@ function main() {
   }
 
   // 5.3) 「以前はあったが、今回 schema からは出てこない CREATE INDEX」→ DROP を作る
-  const dropStmts = [];
+  const dropStmts: SqlBlock[] = [];
   for (const [h, rec] of histCreates) {
     // 「今の履歴上、まだ生きているインデックス」だけ DROP 対象にする
     if (!histActiveCreateHashes.has(h)) continue;
@@ -883,8 +935,8 @@ function main() {
   }
 
   // 7) バンドル生成
-  const extHash = bundleBodyExt ? hashForBundle(bundleBodyExt) : null;
-  const restHash = bundleBodyRest ? hashForBundle(bundleBodyRest) : null;
+  const extHash = bundleBodyExt ? hashForBundle(bundleBodyExt) : undefined;
+  const restHash = bundleBodyRest ? hashForBundle(bundleBodyRest) : undefined;
 
   const extBundle = bundleBodyExt
     ? makeBundle(EXT_MARK, extHash, bundleBodyExt, "extensions")
@@ -953,9 +1005,9 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (e) {
-  console.error(`prisma-partials: ERROR:\n${e?.stack ? e.stack : String(e)}`);
+main().catch((e) => {
+  console.error(
+    `prisma-partials: ERROR:\n${e && (e as Error).stack ? (e as Error).stack : String(e)}`,
+  );
   process.exit(1);
-}
+});

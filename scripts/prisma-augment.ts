@@ -25,11 +25,26 @@ const DEBUG = process.env.DEBUG_PARTIALS === "1";
 
 const EXT_MARK = "GENERATED_EXTENSIONS";
 const REST_MARK = "GENERATED_AUGMENT";
-
+/*
 const GENERATED_BLOCK_RES = [
   /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
   /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
   /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+] as const;
+*/
+const GENERATED_BLOCK_RES = [
+  {
+    kind: "extensions" as const,
+    re: /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+  },
+  {
+    kind: "augment" as const,
+    re: /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+  },
+  {
+    kind: "partials" as const,
+    re: /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+  },
 ] as const;
 
 type ExtractedKind = (typeof ORDER)[number]; // "partialIndex" | "partialUnique" | "raw"
@@ -156,6 +171,7 @@ function normalizeForDedup(sql: string): string {
     .replace(/\s*;\s*$/, ";")
     .trim();
 }
+
 function splitStatements(text: string): string[] {
   const out: string[] = [];
   let buf = "";
@@ -198,6 +214,47 @@ function splitStatements(text: string): string[] {
   return out;
 }
 
+function forEachHistoricalStatement(
+  callback: (ctx: HistoricalStmtContext) => void,
+): void {
+  if (!fs.existsSync(MIGRATIONS_DIR)) return;
+
+  const dirs = fs
+    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory())
+    .map((d) => d.name)
+    .sort(); // 時系列順
+
+  for (const dirName of dirs) {
+    const migrationPath = path.join(MIGRATIONS_DIR, dirName, "migration.sql");
+    if (!fs.existsSync(migrationPath)) continue;
+
+    const txt = fs.readFileSync(migrationPath, "utf8");
+
+    for (const { kind, re } of GENERATED_BLOCK_RES) {
+      // RegExp は lastIndex を持つので毎回クローンして使う
+      const regex = new RegExp(re.source, re.flags);
+      let m: RegExpExecArray | null = regex.exec(txt);
+      while (m !== null) {
+        const body = m[1] ?? "";
+        const stmts = splitStatements(body).filter(Boolean);
+
+        for (const raw of stmts) {
+          const stmt = normalizeTerminator(raw).trim();
+          if (!stmt) continue;
+
+          callback({
+            stmt,
+            migrationDir: dirName,
+            blockKind: kind,
+          });
+        }
+        m = regex.exec(txt);
+      }
+    }
+  }
+}
+
 // ========== Prisma schema → 物理名マップ ==========
 async function buildModelMap(schemaText: string): Promise<ModelMap> {
   // Prisma の DMMF を取得
@@ -230,91 +287,45 @@ async function buildModelMap(schemaText: string): Promise<ModelMap> {
 
 function loadHistoricalKeys(): Set<string> {
   const keys = new Set<string>();
-  if (!fs.existsSync(MIGRATIONS_DIR)) return keys;
-  const dirs = fs
-    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort();
 
-  for (const d of dirs) {
-    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
-    if (!fs.existsSync(p)) continue;
-    const txt = fs.readFileSync(p, "utf8");
+  forEachHistoricalStatement(({ stmt }) => {
+    keys.add(hashForStatement(stmt));
+  });
 
-    for (const baseRe of GENERATED_BLOCK_RES) {
-      const re = new RegExp(baseRe.source, baseRe.flags);
-      let m = re.exec(txt);
-      while (m !== null) {
-        const body = m[1] || "";
-        const stmts = splitStatements(body).filter(Boolean);
-        for (const st of stmts) {
-          keys.add(hashForStatement(st));
-        }
-        m = re.exec(txt);
-      }
-    }
-  }
   return keys;
 }
 
 function loadHistoricalActiveCreateHashes(): Set<string> {
   // 「現在時点で生きている CREATE INDEX / UNIQUE INDEX」のハッシュ集合
-  const activeByIndex = new Map<string, string>(); // indexName -> hash
-  const activeHashes = new Set<string>();
+  const activeByIndex = new Map<string, string>();
 
-  if (!fs.existsSync(MIGRATIONS_DIR)) return activeHashes;
+  forEachHistoricalStatement(({ stmt }) => {
+    const stripped = stmt.replace(/--.*$/gm, "").trim();
+    if (!stripped) return;
 
-  const dirs = fs
-    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort(); // ここで時系列順になる
-
-  for (const d of dirs) {
-    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
-    if (!fs.existsSync(p)) continue;
-    const txt = fs.readFileSync(p, "utf8");
-
-    for (const baseRe of GENERATED_BLOCK_RES) {
-      const re = new RegExp(baseRe.source, baseRe.flags);
-      let m = re.exec(txt);
-      while (m !== null) {
-        const body = m[1] || "";
-        const stmts = splitStatements(body).filter(Boolean);
-
-        for (const raw of stmts) {
-          const stmt = normalizeTerminator(raw).trim();
-          const stripped = stmt.replace(/--.*$/gm, "").trim();
-          if (!stripped) continue;
-
-          // CREATE INDEX / CREATE UNIQUE INDEX
-          if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) {
-            const h = hashForStatement(stmt);
-            const mm = stripped.match(
-              /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
-            );
-            if (!mm) continue;
-            const indexName = mm[3] || `"${mm[4]}"`;
-
-            activeByIndex.set(indexName, h);
-            continue;
-          }
-
-          // DROP INDEX IF EXISTS indexName
-          const dropMatch = stripped.match(
-            /^\s*DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("?([\w]+)"?)/i,
-          );
-          if (dropMatch) {
-            const indexName = dropMatch[2] || `"${dropMatch[3]}"`;
-            activeByIndex.delete(indexName);
-          }
-        }
-        m = re.exec(txt);
-      }
+    // CREATE INDEX / CREATE UNIQUE INDEX
+    if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) {
+      const h = hashForStatement(stmt);
+      const mm = stripped.match(
+        /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
+      );
+      if (!mm) return;
+      const indexName = mm[3] || `"${mm[4]}"`;
+      activeByIndex.set(indexName, h);
+      return;
     }
-  }
 
+    // DROP INDEX IF EXISTS indexName
+    const dropMatch = stripped.match(
+      /^\s*DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("?([\w]+)"?)/i,
+    );
+    if (dropMatch) {
+      const indexName = dropMatch[2] || `"${dropMatch[3]}"`;
+      activeByIndex.delete(indexName);
+    }
+  });
+
+  const activeHashes = new Set<string>();
   for (const h of activeByIndex.values()) {
     activeHashes.add(h);
   }
@@ -325,63 +336,34 @@ function loadHistoricalCreates(): Map<
   string,
   { stmt: string; indexName: string }
 > {
-  // hashForStatement(sql) -> { stmt, indexName }
   const creates = new Map<string, { stmt: string; indexName: string }>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return creates;
 
-  const dirs = fs
-    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort();
+  forEachHistoricalStatement(({ stmt, migrationDir }) => {
+    const stripped = stmt.replace(/--.*$/gm, "").trim();
+    if (!stripped) return;
 
-  for (const d of dirs) {
-    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
-    if (!fs.existsSync(p)) continue;
-    const txt = fs.readFileSync(p, "utf8");
+    if (!/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) return;
 
-    for (const baseRe of GENERATED_BLOCK_RES) {
-      const re = new RegExp(baseRe.source, baseRe.flags);
-      let m = re.exec(txt);
-      while (m !== null) {
-        const body = m[1] || "";
-        const stmts = splitStatements(body).filter(Boolean);
+    const h = hashForStatement(stmt);
+    const mm = stripped.match(
+      /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
+    );
+    if (!mm) return;
 
-        for (const raw of stmts) {
-          const stmt = normalizeTerminator(raw).trim();
+    const indexName = mm[3] || `"${mm[4]}"`;
+    creates.set(h, { stmt, indexName });
 
-          // コメントを全部落とした版（kind コメントが先頭に来ても大丈夫にする）
-          const stripped = stmt.replace(/--.*$/gm, "").trim();
-          if (!stripped) continue;
-
-          // CREATE [UNIQUE] INDEX ... のみ対象
-          if (!/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) continue;
-
-          const h = hashForStatement(stmt); // ハッシュは元の stmt（コメント込み）でも stripped でもどちらでもよいが、hashForStatement 内でコメントは消しているのでどちらでも同じになる
-
-          // インデックス名を取り出す
-          const mm = stripped.match(
-            /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
-          );
-          if (!mm) continue;
-
-          const indexName = mm[3] || `"${mm[4]}"`;
-          creates.set(h, { stmt, indexName });
-
-          if (DEBUG) {
-            console.log("[DEBUG] hist CREATE:", {
-              hash: h,
-              indexName,
-              stmt,
-              migration: d,
-            });
-          }
-        }
-        m = re.exec(txt);
-      }
+    if (DEBUG) {
+      console.log("[DEBUG] hist CREATE:", {
+        hash: h,
+        indexName,
+        stmt,
+        migration: migrationDir,
+      });
     }
-  }
+  });
 
   if (DEBUG) {
     console.log("[DEBUG] loadHistoricalCreates: total =", creates.size);
@@ -392,49 +374,23 @@ function loadHistoricalCreates(): Map<
 
 function loadHistoricalRawStatements(): Map<string, string> {
   // GENERATED_* ブロックのうち -- kind: raw のものだけを @raw.sql 由来として拾う
-  // hashForStatement(sql) -> stmt
   const raws = new Map<string, string>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return raws;
 
-  const dirs = fs
-    .readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
-    .filter((d) => d.isDirectory())
-    .map((d) => d.name)
-    .sort();
+  forEachHistoricalStatement(({ stmt }) => {
+    const stripped = stmt.replace(/--.*$/gm, "").trim();
+    if (!stripped) return;
 
-  for (const d of dirs) {
-    const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
-    if (!fs.existsSync(p)) continue;
-    const txt = fs.readFileSync(p, "utf8");
+    const kindMatch = stmt.match(/^\s*--\s*kind:\s*(\w+)/i);
+    const kind = kindMatch ? kindMatch[1].toLowerCase() : null;
+    if (kind !== "raw") return;
 
-    for (const baseRe of GENERATED_BLOCK_RES) {
-      const re = new RegExp(baseRe.source, baseRe.flags);
-      let m = re.exec(txt);
-      while (m !== null) {
-        const body = m[1] || "";
-        const stmts = splitStatements(body).filter(Boolean);
-
-        for (const raw of stmts) {
-          const stmt = normalizeTerminator(raw).trim();
-          const stripped = stmt.replace(/--.*$/gm, "").trim();
-          if (!stripped) continue;
-
-          // 先頭行の kind コメントを見る
-          const kindMatch = stmt.match(/^\s*--\s*kind:\s*(\w+)/i);
-          const kind = kindMatch ? kindMatch[1].toLowerCase() : null;
-
-          if (kind !== "raw") continue;
-
-          const h = hashForStatement(stmt);
-          if (!raws.has(h)) {
-            raws.set(h, stmt);
-          }
-        }
-        m = re.exec(txt);
-      }
+    const h = hashForStatement(stmt);
+    if (!raws.has(h)) {
+      raws.set(h, stmt);
     }
-  }
+  });
 
   if (DEBUG) {
     console.log(

@@ -2,6 +2,9 @@
   "name": "my-app2",
   "version": "0.1.0",
   "private": true,
+  "engages": {
+    "node": ">=24.0.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -18,27 +21,25 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.5",
     "@mui/material": "^7.3.5",
-    "@prisma/client": "^6.19.0",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
     "next": "^16.0.3",
     "next-auth": "^5.0.0-beta.29",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.5",
+    "@biomejs/biome": "^2.3.6",
     "@prisma/generator-helper": "^7.0.0",
     "@prisma/internals": "^7.0.0",
     "@types/node": "^24.10.1",
-    "@types/react": "^19.2.5",
+    "@types/react": "^19.2.6",
     "@types/react-dom": "^19.2.3",
     "husky": "^9.1.7",
-    "lint-staged": "^16.2.6",
-    "prisma": "^6.19.0",
+    "lint-staged": "^16.2.7",
+    "prisma": "^7.0.0",
     "tsx": "^4.20.6",
     "typescript": "^5.9.3"
-  },
-  "prisma": {
-    "seed": "tsx prisma/seed.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [

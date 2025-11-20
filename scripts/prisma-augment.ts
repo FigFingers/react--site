@@ -1,4 +1,4 @@
-// scripts/prisma-partials.js
+// scripts/prisma-augment.ts
 // 宣言的 @@partialIndex / @@partialUnique と /// @raw.sql を解析し、
 // 生成SQLを「過去生成分との差分のみ」最新 migration.sql に追記（または置換）する。
 // - ドライラン: `--check` か環境変数 `DRY_RUN=1`
@@ -18,7 +18,7 @@ const SCHEMA = path.resolve("prisma/schema.prisma");
 const MIGRATIONS_DIR = path.resolve("prisma/migrations");
 
 const DEFAULT_SCHEMA = "public";
-const ORDER = ["partialIndex", "partialUnique", "raw"] as const; // DROP はあとで dropStmts として allNews = [...news, ...dropStmts] に足されるため不記載
+const ORDER = ["partialIndex", "partialUnique", "raw"] as const; // DROP はあとで dropStmts として allNews に足されるため不記載
 
 const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
 const DEBUG = process.env.DEBUG_PARTIALS === "1";
@@ -26,8 +26,22 @@ const DEBUG = process.env.DEBUG_PARTIALS === "1";
 const EXT_MARK = "GENERATED_EXTENSIONS";
 const REST_MARK = "GENERATED_AUGMENT";
 
-type OrderBlockKind = (typeof ORDER)[number]; // "partialIndex" | "partialUnique" | "raw"
-type BlockKind = OrderBlockKind | "drop";
+const GENERATED_BLOCK_RES = [
+  /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
+  /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
+  /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
+] as const;
+
+type ExtractedKind = (typeof ORDER)[number]; // "partialIndex" | "partialUnique" | "raw"
+type BlockKind = ExtractedKind | "drop";
+
+type GeneratedBlockKind = "extensions" | "augment" | "partials";
+
+interface HistoricalStmtContext {
+  stmt: string;
+  migrationDir: string;
+  blockKind: GeneratedBlockKind;
+}
 
 interface PartialIndexOptions {
   name?: string;
@@ -43,7 +57,7 @@ interface SqlBlock {
 }
 
 interface ExtractedBlock {
-  kind: BlockKind;
+  kind: ExtractedKind;
   sql: string;
 }
 
@@ -58,7 +72,7 @@ type ModelMap = Record<string, ModelInfo>;
 // ========== 共通ユーティリティ ==========
 function makeBundle(
   mark: string,
-  hash: string | undefined,
+  hash: string,
   body: string,
   label: string,
 ): string {
@@ -223,18 +237,12 @@ function loadHistoricalKeys(): Set<string> {
     .map((d) => d.name)
     .sort();
 
-  const blockRes = [
-    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-  ];
-
   for (const d of dirs) {
     const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const baseRe of blockRes) {
+    for (const baseRe of GENERATED_BLOCK_RES) {
       const re = new RegExp(baseRe.source, baseRe.flags);
       let m = re.exec(txt);
       while (m !== null) {
@@ -252,7 +260,7 @@ function loadHistoricalKeys(): Set<string> {
 
 function loadHistoricalActiveCreateHashes(): Set<string> {
   // 「現在時点で生きている CREATE INDEX / UNIQUE INDEX」のハッシュ集合
-  const activeByIndex = new Map(); // indexName -> hash
+  const activeByIndex = new Map<string, string>(); // indexName -> hash
   const activeHashes = new Set<string>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return activeHashes;
@@ -263,18 +271,12 @@ function loadHistoricalActiveCreateHashes(): Set<string> {
     .map((d) => d.name)
     .sort(); // ここで時系列順になる
 
-  const blockRes = [
-    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-  ];
-
   for (const d of dirs) {
     const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const baseRe of blockRes) {
+    for (const baseRe of GENERATED_BLOCK_RES) {
       const re = new RegExp(baseRe.source, baseRe.flags);
       let m = re.exec(txt);
       while (m !== null) {
@@ -324,7 +326,7 @@ function loadHistoricalCreates(): Map<
   { stmt: string; indexName: string }
 > {
   // hashForStatement(sql) -> { stmt, indexName }
-  const creates = new Map();
+  const creates = new Map<string, { stmt: string; indexName: string }>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return creates;
 
@@ -334,18 +336,12 @@ function loadHistoricalCreates(): Map<
     .map((d) => d.name)
     .sort();
 
-  const blockRes = [
-    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-  ];
-
   for (const d of dirs) {
     const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const baseRe of blockRes) {
+    for (const baseRe of GENERATED_BLOCK_RES) {
       const re = new RegExp(baseRe.source, baseRe.flags);
       let m = re.exec(txt);
       while (m !== null) {
@@ -397,7 +393,7 @@ function loadHistoricalCreates(): Map<
 function loadHistoricalRawStatements(): Map<string, string> {
   // GENERATED_* ブロックのうち -- kind: raw のものだけを @raw.sql 由来として拾う
   // hashForStatement(sql) -> stmt
-  const raws = new Map();
+  const raws = new Map<string, string>();
 
   if (!fs.existsSync(MIGRATIONS_DIR)) return raws;
 
@@ -407,18 +403,12 @@ function loadHistoricalRawStatements(): Map<string, string> {
     .map((d) => d.name)
     .sort();
 
-  const blockRes = [
-    /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
-    /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-  ];
-
   for (const d of dirs) {
     const p = path.join(MIGRATIONS_DIR, d, "migration.sql");
     if (!fs.existsSync(p)) continue;
     const txt = fs.readFileSync(p, "utf8");
 
-    for (const baseRe of blockRes) {
+    for (const baseRe of GENERATED_BLOCK_RES) {
       const re = new RegExp(baseRe.source, baseRe.flags);
       let m = re.exec(txt);
       while (m !== null) {
@@ -495,8 +485,7 @@ function pickLatestMigrationDir(): string {
         return { d, t: stat.mtimeMs };
       })
       .sort((a, b) => a.t - b.t);
-    const last = sorted[sorted.length - 1]; // ← undefined になる可能性は論理的に無い
-    latest = last.d;
+    latest = sorted[sorted.length - 1].d;
   }
   return path.join(MIGRATIONS_DIR, latest);
 }
@@ -561,7 +550,7 @@ function filterConflictsWithFile(
   stmts: SqlBlock[],
   migrationSql: string,
 ): SqlBlock[] {
-  const drops = new Set();
+  const drops = new Set<string>();
   const dropRe = /ALTER\s+TABLE\s+"?([\w.]+)"?\s+DROP\s+COLUMN\s+"?([\w]+)"?/gi;
   let m: RegExpExecArray | null;
   while (true) {
@@ -775,14 +764,13 @@ async function main(): Promise<void> {
   );
 
   // 4) 同一ラン内デデュープ（ハッシュ方式）
-  const seenThisRun = new Set();
+  const seenThisRun = new Set<string>();
   const dedupedThisRun: SqlBlock[] = [];
   for (const x of expandedNoConflicts) {
-    const h = hashForStatement(x.stmt);
-    if (seenThisRun.has(h)) continue;
-    seenThisRun.add(h);
+    if (seenThisRun.has(x.hash)) continue;
+    seenThisRun.add(x.hash);
     // ハッシュを持たせておくと後段も楽
-    dedupedThisRun.push({ ...x, hash: h });
+    dedupedThisRun.push(x);
   }
 
   if (DEBUG) {
@@ -935,20 +923,25 @@ async function main(): Promise<void> {
   }
 
   // 7) バンドル生成
-  const extHash = bundleBodyExt ? hashForBundle(bundleBodyExt) : undefined;
-  const restHash = bundleBodyRest ? hashForBundle(bundleBodyRest) : undefined;
+  let extHash: string | undefined;
+  let restHash: string | undefined;
 
-  const extBundle = bundleBodyExt
-    ? makeBundle(EXT_MARK, extHash, bundleBodyExt, "extensions")
-    : "";
-  const restBundle = bundleBodyRest
-    ? makeBundle(
-        REST_MARK,
-        restHash,
-        bundleBodyRest,
-        "partialIndex/partialUnique/raw/drop",
-      )
-    : "";
+  let extBundle = "";
+  if (bundleBodyExt) {
+    extHash = hashForBundle(bundleBodyExt);
+    extBundle = makeBundle(EXT_MARK, extHash, bundleBodyExt, "extensions");
+  }
+
+  let restBundle = "";
+  if (bundleBodyRest) {
+    restHash = hashForBundle(bundleBodyRest);
+    restBundle = makeBundle(
+      REST_MARK,
+      restHash,
+      bundleBodyRest,
+      "partialIndex/partialUnique/raw/drop",
+    );
+  }
 
   // 8) 書き込み：EXTは先頭、RESTは末尾（既存なら置換）
   let migrationSql = migrationSqlNow;

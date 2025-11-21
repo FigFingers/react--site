@@ -2,36 +2,30 @@
 // 宣言的 @@partialIndex / @@partialUnique と /// @raw.sql を解析し、
 // 生成SQLを「過去生成分との差分のみ」最新 migration.sql に追記（または置換）する。
 // - ドライラン: `--check` か環境変数 `DRY_RUN=1`
-// - 履歴重複排除: 過去の GENERATED_(EXTENSIONS|AUGMENT|PARTIALS) ブロックから既出SQLを収集
+// - 履歴重複排除: 過去の GENERATED_(EXTENSIONS|AUGMENT) ブロックから既出SQLを収集
 // - 同一 migration 内の DROP/ADD 衝突を自動回避
 //
 // biome-ignore-all lint/suspicious/noConsole: cli script
 // biome-ignore-all lint/security/noSecrets: not exist SecretStrings
 
 import crypto from "node:crypto";
+import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import type { DMMF } from "@prisma/generator-helper";
 import { getDMMF } from "@prisma/internals";
 
+const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
+const DEBUG = process.env.DEBUG_AUGMENT === "1";
+
 const SCHEMA = path.resolve("prisma/schema.prisma");
 const MIGRATIONS_DIR = path.resolve("prisma/migrations");
 
-const DEFAULT_SCHEMA = "public";
+const DEFAULT_SCHEMA = resolveDefaultSchema();
 const ORDER = ["partialIndex", "partialUnique", "raw"] as const; // DROP はあとで dropStmts として allNews に足されるため不記載
-
-const DRY_RUN = process.argv.includes("--check") || process.env.DRY_RUN === "1";
-const DEBUG = process.env.DEBUG_PARTIALS === "1";
 
 const EXT_MARK = "GENERATED_EXTENSIONS";
 const REST_MARK = "GENERATED_AUGMENT";
-/*
-const GENERATED_BLOCK_RES = [
-  /-- GENERATED_EXTENSIONS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_EXTENSIONS_END [a-f0-9]{12}\b/gm,
-  /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
-  /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-] as const;
-*/
 const GENERATED_BLOCK_RES = [
   {
     kind: "extensions" as const,
@@ -41,16 +35,16 @@ const GENERATED_BLOCK_RES = [
     kind: "augment" as const,
     re: /-- GENERATED_AUGMENT_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_AUGMENT_END [a-f0-9]{12}\b/gm,
   },
-  {
-    kind: "partials" as const,
-    re: /-- GENERATED_PARTIALS_BEGIN [a-f0-9]{12}\b([\s\S]*?)-- GENERATED_PARTIALS_END [a-f0-9]{12}\b/gm,
-  },
 ] as const;
+
+const CREATE_INDEX_RE =
+  /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i;
+const DROP_INDEX_RE = /^\s*DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("?([\w]+)"?)/i;
 
 type ExtractedKind = (typeof ORDER)[number]; // "partialIndex" | "partialUnique" | "raw"
 type BlockKind = ExtractedKind | "drop";
 
-type GeneratedBlockKind = "extensions" | "augment" | "partials";
+type GeneratedBlockKind = "extensions" | "augment";
 
 interface HistoricalStmtContext {
   stmt: string;
@@ -85,6 +79,33 @@ interface ModelInfo {
 type ModelMap = Record<string, ModelInfo>;
 
 // ========== 共通ユーティリティ ==========
+function resolveDefaultSchema(): string {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    if (DEBUG) console.log("[DEBUG] DATABASE_URL not set → schema=public");
+    return "public";
+  }
+
+  try {
+    const u = new URL(url);
+    const schema = u.searchParams.get("schema");
+    if (schema && schema.trim().length > 0) {
+      if (DEBUG)
+        console.log(`[DEBUG] schema found in DATABASE_URL → ${schema}`);
+      return schema;
+    }
+    if (DEBUG)
+      console.log("[DEBUG] no ?schema= param in DATABASE_URL → schema=public");
+    return "public";
+  } catch {
+    if (DEBUG)
+      console.log(
+        "[DEBUG] DATABASE_URL is not a valid URL → fallback schema=public",
+      );
+    return "public";
+  }
+}
+
 function makeBundle(
   mark: string,
   hash: string,
@@ -104,12 +125,19 @@ function readSchema(): string {
 }
 
 function safeIdent(name?: string | null): string {
-  return String(name || "")
+  const out = String(name || "")
     .trim()
     .replace(/[^a-zA-Z0-9_]/g, "_")
     .toLowerCase()
     .replace(/^_+/, "")
     .slice(0, 63);
+
+  if (!out) {
+    throw new Error(
+      `Index name "${name}" is invalid: results in empty identifier`,
+    );
+  }
+  return out;
 }
 
 function splitTopLevel(ss: string | null | undefined): string[] {
@@ -306,9 +334,7 @@ function loadHistoricalActiveCreateHashes(): Set<string> {
     // CREATE INDEX / CREATE UNIQUE INDEX
     if (/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) {
       const h = hashForStatement(stmt);
-      const mm = stripped.match(
-        /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
-      );
+      const mm = stripped.match(CREATE_INDEX_RE);
       if (!mm) return;
       const indexName = mm[3] || `"${mm[4]}"`;
       activeByIndex.set(indexName, h);
@@ -316,9 +342,7 @@ function loadHistoricalActiveCreateHashes(): Set<string> {
     }
 
     // DROP INDEX IF EXISTS indexName
-    const dropMatch = stripped.match(
-      /^\s*DROP\s+INDEX\s+(IF\s+EXISTS\s+)?("?([\w]+)"?)/i,
-    );
+    const dropMatch = stripped.match(DROP_INDEX_RE);
     if (dropMatch) {
       const indexName = dropMatch[2] || `"${dropMatch[3]}"`;
       activeByIndex.delete(indexName);
@@ -338,8 +362,6 @@ function loadHistoricalCreates(): Map<
 > {
   const creates = new Map<string, { stmt: string; indexName: string }>();
 
-  if (!fs.existsSync(MIGRATIONS_DIR)) return creates;
-
   forEachHistoricalStatement(({ stmt, migrationDir }) => {
     const stripped = stmt.replace(/--.*$/gm, "").trim();
     if (!stripped) return;
@@ -347,9 +369,7 @@ function loadHistoricalCreates(): Map<
     if (!/^\s*CREATE\s+(UNIQUE\s+)?INDEX\b/i.test(stripped)) return;
 
     const h = hashForStatement(stmt);
-    const mm = stripped.match(
-      /^\s*CREATE\s+(UNIQUE\s+)?INDEX\s+(IF\s+NOT\s+EXISTS\s+)?("?([\w]+)"?)/i,
-    );
+    const mm = stripped.match(CREATE_INDEX_RE);
     if (!mm) return;
 
     const indexName = mm[3] || `"${mm[4]}"`;
@@ -375,8 +395,6 @@ function loadHistoricalCreates(): Map<
 function loadHistoricalRawStatements(): Map<string, string> {
   // GENERATED_* ブロックのうち -- kind: raw のものだけを @raw.sql 由来として拾う
   const raws = new Map<string, string>();
-
-  if (!fs.existsSync(MIGRATIONS_DIR)) return raws;
 
   forEachHistoricalStatement(({ stmt }) => {
     const stripped = stmt.replace(/--.*$/gm, "").trim();
@@ -502,6 +520,10 @@ function hashForStatement(sql: string): string {
 }
 
 // ========== 同一 migration 内の DROP/ADD 衝突回避 ==========
+// この migration.sql 内に既にある `ALTER TABLE ... DROP COLUMN ...` と
+// これから追加しようとしている `ALTER TABLE ... ADD COLUMN ...` が
+// 同じ (table, column) の組み合わせだった場合、その ADD をスキップする。
+
 function filterConflictsWithFile(
   stmts: SqlBlock[],
   migrationSql: string,
@@ -919,7 +941,7 @@ async function main(): Promise<void> {
 
     if (DRY_RUN) {
       console.log(
-        "[DRY-RUN] prisma-partials would " +
+        "[DRY-RUN] prisma-augment would " +
           (willReplace ? "replace" : "append") +
           " REST block in:",
       );
@@ -938,25 +960,25 @@ async function main(): Promise<void> {
 
     writeFileAtomic(migrationPath, nextSql);
     console.log(
-      `prisma-partials: wrote EXT at head (${extHash || "none"}), and ${
+      `prisma-augment: wrote EXT at head (${extHash || "none"}), and ${
         willReplace ? "updated REST" : "appended REST"
       } (${restHash || "none"}) to ${migrationPath}`,
     );
   } else {
     if (DRY_RUN)
       console.log(
-        "[DRY-RUN] prisma-partials would write only EXT block at head (REST none).",
+        "[DRY-RUN] prisma-augment would write only EXT block at head (REST none).",
       );
     else
       console.log(
-        `prisma-partials: wrote only EXT block at head (${extHash}) to ${migrationPath}`,
+        `prisma-augment: wrote only EXT block at head (${extHash}) to ${migrationPath}`,
       );
   }
 }
 
 main().catch((e) => {
   console.error(
-    `prisma-partials: ERROR:\n${e && (e as Error).stack ? (e as Error).stack : String(e)}`,
+    `prisma-augment: ERROR:\n${e && (e as Error).stack ? (e as Error).stack : String(e)}`,
   );
   process.exit(1);
 });

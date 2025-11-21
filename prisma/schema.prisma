@@ -234,5 +234,5 @@ model VerificationToken {
 ///   ADD CONSTRAINT clips_time_ck CHECK (start_ms >= 0 AND end_ms > start_ms);
 
 /// @raw.sql CREATE INDEX IF NOT EXISTS clips_title_trgm_gin
-///   ON  "public"."clips" USING GIN (title gin_trgm_ops)
+///   ON "public"."clips" USING GIN (title gin_trgm_ops)
 ///   WHERE deleted_at IS NULL;

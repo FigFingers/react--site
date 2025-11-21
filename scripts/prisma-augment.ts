@@ -6,7 +6,7 @@
 // - 同一 migration 内の DROP/ADD 衝突を自動回避
 //
 // biome-ignore-all lint/suspicious/noConsole: cli script
-// biome-ignore-all lint/security/noSecrets: not exist SecretStrings
+// biome-ignore-all lint/security/noSecrets: There is no confidential data.
 
 import crypto from "node:crypto";
 import "dotenv/config";

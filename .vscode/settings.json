@@ -1,4 +1,3 @@
-// biome-ignore-all lint/suspicious/noQuickfixBiome: Scripts are broken by quickfix when nested.
 {
   "editor.formatOnSave": true,
 
@@ -8,7 +7,6 @@
   // 保存時のインポート整理（VSCode側）：二重実行が気になるなら "explicit" に
   "editor.codeActionsOnSave": {
     "source.organizeImports": "never",
-    "quickfix.biome": "never",
     "source.fixAll.biome": "explicit"
   },
 

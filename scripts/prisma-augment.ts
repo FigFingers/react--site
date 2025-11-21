@@ -79,6 +79,10 @@ interface ModelInfo {
 type ModelMap = Record<string, ModelInfo>;
 
 // ========== 共通ユーティリティ ==========
+
+// DATABASE_URL の searchParams(schema) を優先し、無ければ public。
+// Prisma のデフォルト schema と Postgres の慣習に合わせている。
+// （複数 schema を使うプロジェクトで書き換える可能性あり）
 function resolveDefaultSchema(): string {
   const url = process.env.DATABASE_URL;
   if (!url) {
@@ -200,6 +204,9 @@ function normalizeForDedup(sql: string): string {
     .trim();
 }
 
+// DO $$ ... $$; を 1 ステートメントとして扱う簡易パーサ。
+// セミコロン区切りの通常 SQL と混在するため独自処理している。
+// （多段 $$tag$$ など複雑な PL/pgSQL は扱わない前提）
 function splitStatements(text: string): string[] {
   const out: string[] = [];
   let buf = "";
@@ -242,6 +249,9 @@ function splitStatements(text: string): string[] {
   return out;
 }
 
+// 各 migration.sql の中から「GENERATED_EXTENSIONS / GENERATED_AUGMENT」の
+// ブロック部分だけを抽出し、そこに含まれる SQL を callback に渡す。
+// 手書きの SQL（スキーマ変更）は対象外。
 function forEachHistoricalStatement(
   callback: (ctx: HistoricalStmtContext) => void,
 ): void {
@@ -323,6 +333,9 @@ function loadHistoricalKeys(): Set<string> {
   return keys;
 }
 
+// 過去に生成された CREATE INDEX のうち、
+// まだ DROP されていない “生きている” インデックスだけのハッシュ集合。
+// → 新しい schema に無ければ DROP を生成するために使う。
 function loadHistoricalActiveCreateHashes(): Set<string> {
   // 「現在時点で生きている CREATE INDEX / UNIQUE INDEX」のハッシュ集合
   const activeByIndex = new Map<string, string>();
@@ -470,6 +483,9 @@ function writeFileAtomic(filePath: string, content: string): void {
   fs.renameSync(tmp, filePath);
 }
 
+// EXTENSIONS ブロックは migration.sql の先頭に必ず置く。
+// すでに存在すれば置き換え、無ければ prepend。
+// （CREATE EXTENSION は migration の最初に来るべき）
 function writeBlockAtTop(
   filePath: string,
   block: string,
@@ -503,6 +519,8 @@ function isCreateExtension(stmt: string): boolean {
   return /^\s*CREATE\s+EXTENSION\b/i.test(stmt);
 }
 
+// SQL の内容ベースでハッシュ化し、変更検知と履歴デデュープに使う。
+// 12桁で十分な一意性がある（sha256 の先頭）ので軽量にしている。
 function hashForBundle(body: string): string {
   return crypto
     .createHash("sha256")
@@ -800,6 +818,8 @@ async function main(): Promise<void> {
   const histRawStmts = loadHistoricalRawStatements();
 
   // 5.2.3) 過去にはあったが、今回 schema からは出てこない raw SQL を警告
+  // 過去に生成した raw.sql が schema から消えていても自動 DROP はしない。
+  // （raw SQL は idempotency が保証できないため。手動対応を想定）
   const vanishedRaw: { hash: string; stmt: string }[] = [];
   for (const [h, stmt] of histRawStmts) {
     if (!currentRawHashes.has(h)) {
@@ -877,6 +897,9 @@ async function main(): Promise<void> {
   }
 
   // 6) EXT と REST に分割
+  // EXT: CREATE EXTENSION など migration の最初に置きたいもの
+  // REST: インデックスや raw SQL などその他の生成物
+  // この2ブロックに分けることで、migration.sql の見通しをよくする
   const newsExt = allNews.filter((x) => isCreateExtension(x.stmt));
   const newsRest = allNews.filter((x) => !isCreateExtension(x.stmt));
 

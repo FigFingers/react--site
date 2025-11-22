@@ -2,9 +2,9 @@
 
 "use client";
 
+import type { Session } from "next-auth";
 import { SessionProvider as NextAuthProvider } from "next-auth/react";
-import { Session } from "next-auth";
-import React from "react";
+import type React from "react";
 
 export function SessionProvider({
   children,

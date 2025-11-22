@@ -1,16 +1,11 @@
 {
   "editor.formatOnSave": true,
-
-  // Biome を既定フォーマッタに
   "editor.defaultFormatter": "biomejs.biome",
-
-  // 保存時のインポート整理（VSCode側）：二重実行が気になるなら "explicit" に
   "editor.codeActionsOnSave": {
     "source.organizeImports": "never",
     "source.fixAll.biome": "explicit"
   },
-
-  // 競合しがちな拡張は無効化（入っているなら）
+  // 競合しがちな拡張は無効化
   "prettier.enable": false,
   "eslint.enable": false
 }

@@ -1,5 +1,5 @@
-import * as repo from "@/server/repositories/clips";
 import { ForbiddenError, NotFoundError } from "@/server/http/errors";
+import * as repo from "@/server/repositories/clips";
 
 export function listClips(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
@@ -11,17 +11,28 @@ export async function getClip(id: number) {
   return clip;
 }
 
-export function createClip(currentUserId: number, data: Omit<Parameters<typeof repo.create>[0], "userId">) {
+export function createClip(
+  currentUserId: number,
+  data: Omit<Parameters<typeof repo.create>[0], "userId">,
+) {
   return repo.create({ ...data, userId: currentUserId });
 }
 
-export async function updateClip(currentUserId: number, id: number, data: Parameters<typeof repo.update>[1]) {
+export async function updateClip(
+  currentUserId: number,
+  id: number,
+  data: Parameters<typeof repo.update>[1],
+) {
   const clip = await getClip(id);
   if (clip.userId !== currentUserId) throw new ForbiddenError();
   return repo.update(id, data);
 }
 
-export async function deleteClip(currentUserId: number, id: number, hard = false) {
+export async function deleteClip(
+  currentUserId: number,
+  id: number,
+  hard = false,
+) {
   const clip = await getClip(id);
   if (clip.userId !== currentUserId) throw new ForbiddenError();
   return hard ? repo.hardDelete(id) : repo.softDelete(id);
@@ -30,4 +41,3 @@ export async function deleteClip(currentUserId: number, id: number, hard = false
 export function incrementClipViews(id: number, by = 1n) {
   return repo.incrementViews(id, by);
 }
-

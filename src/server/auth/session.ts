@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/server/db";
 import { UnauthorizedError } from "@/server/http/errors";
 
-export async function getSession() {
+export function getSession() {
   return auth();
 }
 
@@ -20,4 +20,3 @@ export async function requireUser() {
   if (!user) throw new UnauthorizedError();
   return user;
 }
-

@@ -1,5 +1,5 @@
-import * as repo from "@/server/repositories/playlists";
 import { ForbiddenError, NotFoundError } from "@/server/http/errors";
+import * as repo from "@/server/repositories/playlists";
 
 export function listPlaylists(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
@@ -11,51 +11,83 @@ export async function getPlaylist(id: number) {
   return playlist;
 }
 
-export function createPlaylist(currentUserId: number, data: Omit<Parameters<typeof repo.create>[0], "userId">) {
+export function createPlaylist(
+  currentUserId: number,
+  data: Omit<Parameters<typeof repo.create>[0], "userId">,
+) {
   return repo.create({ ...data, userId: currentUserId });
 }
 
-export async function updatePlaylist(currentUserId: number, id: number, data: Parameters<typeof repo.update>[1]) {
+export async function updatePlaylist(
+  currentUserId: number,
+  id: number,
+  data: Parameters<typeof repo.update>[1],
+) {
   const playlist = await getPlaylist(id);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return repo.update(id, data);
 }
 
-export async function deletePlaylist(currentUserId: number, id: number, hard = false) {
+export async function deletePlaylist(
+  currentUserId: number,
+  id: number,
+  hard = false,
+) {
   const playlist = await getPlaylist(id);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return hard ? repo.hardDelete(id) : repo.softDelete(id);
 }
 
-export async function addClipToPlaylist(currentUserId: number, playlistId: number, clipId: number) {
+export async function addClipToPlaylist(
+  currentUserId: number,
+  playlistId: number,
+  clipId: number,
+) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return repo.addClip(playlistId, clipId);
 }
 
-export async function removeClipFromPlaylist(currentUserId: number, playlistId: number, clipId: number) {
+export async function removeClipFromPlaylist(
+  currentUserId: number,
+  playlistId: number,
+  clipId: number,
+) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return repo.removeClip(playlistId, clipId);
 }
 
-export function listPlaylistClips(playlistId: number, opts?: Parameters<typeof repo.listClips>[1]) {
+export function listPlaylistClips(
+  playlistId: number,
+  opts?: Parameters<typeof repo.listClips>[1],
+) {
   return repo.listClips(playlistId, opts);
 }
 
-export async function addVodToPlaylist(currentUserId: number, playlistId: number, vodId: number) {
+export async function addVodToPlaylist(
+  currentUserId: number,
+  playlistId: number,
+  vodId: number,
+) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return repo.addVod(playlistId, vodId);
 }
 
-export async function removeVodFromPlaylist(currentUserId: number, playlistId: number, vodId: number) {
+export async function removeVodFromPlaylist(
+  currentUserId: number,
+  playlistId: number,
+  vodId: number,
+) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
   return repo.removeVod(playlistId, vodId);
 }
 
-export function listPlaylistVods(playlistId: number, opts?: Parameters<typeof repo.listVods>[1]) {
+export function listPlaylistVods(
+  playlistId: number,
+  opts?: Parameters<typeof repo.listVods>[1],
+) {
   return repo.listVods(playlistId, opts);
 }
-

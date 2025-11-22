@@ -13,12 +13,12 @@ datasource db {
 
 // NextAuthのUserと統合
 model User {
-  id             Int       @id @default(autoincrement())
-  name           String?   @db.VarChar(255)
-  email          String?   @db.Citext
-  emailVerified  DateTime? @map("email_verified") @db.Timestamptz(6)
-  image          String?   @db.VarChar(2048)
-  hashedPassword String?   @map("hashed_password") @db.VarChar(255)
+  id              BigInt    @id @default(autoincrement()) @db.BigInt
+  name            String?   @db.VarChar(255)
+  email           String?   @db.Citext
+  emailVerified   DateTime? @map("email_verified") @db.Timestamptz(6)
+  image           String?   @db.VarChar(2048)
+  hashedPassword  String?   @map("hashed_password") @db.VarChar(255)
 
   // ドメイン属性
   region    String?   @db.VarChar(255)
@@ -42,7 +42,7 @@ model User {
 }
 
 model Vod {
-  id        Int       @id @default(autoincrement())
+  id        Int    @id @default(autoincrement())
   code      String    @db.VarChar(50)
   name      String    @db.VarChar(255)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -74,19 +74,19 @@ model VodAlias {
 }
 
 model Clip {
-  id         Int       @id @default(autoincrement())
-  userId     Int       @map("user_id")
-  vodId      Int       @map("vod_id")
-  name       String    @db.VarChar(255)
-  title      String
-  views      BigInt    @default(0) @db.BigInt
-  startMs    Int       @map("start_ms")
-  endMs      Int       @map("end_ms")
-  url        String
-  epnum      String?
-  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt  DateTime? @map("deleted_at") @db.Timestamptz(6)
+  id          BigInt    @id @default(autoincrement()) @db.BigInt
+  userId      BigInt    @map("user_id") @db.BigInt
+  vodId       Int       @map("vod_id")
+  name        String    @db.VarChar(255)
+  title       String
+  views       BigInt    @default(0) @db.BigInt
+  startMs     Int       @map("start_ms")
+  endMs       Int       @map("end_ms")
+  url         String
+  epnum       String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
@@ -100,9 +100,9 @@ model Clip {
 }
 
 model Playlist {
-  id        Int       @id @default(autoincrement())
+  id        BigInt    @id @default(autoincrement()) @db.BigInt
   name      String    @db.VarChar(255)
-  userId    Int       @map("user_id")
+  userId    BigInt    @map("user_id") @db.BigInt
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -118,9 +118,9 @@ model Playlist {
 }
 
 model UserVod {
-  userId    Int      @map("user_id")
-  vodId     Int      @map("vod_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userId    BigInt    @map("user_id") @db.BigInt
+  vodId     Int       @map("vod_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
@@ -131,10 +131,10 @@ model UserVod {
 }
 
 model ClipPlaylist {
-  clipId     Int      @map("clip_id")
-  playlistId Int      @map("playlist_id")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  clipId      BigInt    @map("clip_id") @db.BigInt
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
   clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
   playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
@@ -145,9 +145,9 @@ model ClipPlaylist {
 }
 
 model PlaylistVod {
-  playlistId Int      @map("playlist_id")
-  vodId      Int      @map("vod_id")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  vodId       Int       @map("vod_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   vod      Vod      @relation(fields: [vodId], references: [id], onDelete: Cascade)
@@ -159,9 +159,9 @@ model PlaylistVod {
 }
 
 model FavoriteClip {
-  userId    Int      @map("user_id")
-  clipId    Int      @map("clip_id")
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userId    BigInt    @map("user_id") @db.BigInt
+  clipId    BigInt    @map("clip_id") @db.BigInt
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
@@ -173,12 +173,12 @@ model FavoriteClip {
 }
 
 model FavoritePlaylist {
-  userId     Int      @map("user_id")
-  playlistId Int      @map("playlist_id")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  userId      BigInt    @map("user_id") @db.BigInt
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlist    Playlist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
   @@id([userId, playlistId])
   @@index([userId, createdAt])
@@ -189,7 +189,7 @@ model FavoritePlaylist {
 // NextAuth モデル
 model Account {
   id                Int     @id @default(autoincrement())
-  userId            Int     @map("user_id")
+  userId            BigInt  @map("user_id") @db.BigInt
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
@@ -211,7 +211,7 @@ model Account {
 model Session {
   id           String   @id @default(cuid())
   sessionToken String   @unique @map("session_token")
-  userId       Int      @map("user_id")
+  userId       BigInt   @map("user_id") @db.BigInt
   expires      DateTime @db.Timestamptz(6)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

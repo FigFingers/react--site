@@ -1,6 +1,9 @@
 import * as repo from "@/server/repositories/favorites";
 
-export function listMyFavoriteClips(userId: number, opts?: Parameters<typeof repo.listFavoriteClips>[1]) {
+export function listMyFavoriteClips(
+  userId: number,
+  opts?: Parameters<typeof repo.listFavoriteClips>[1],
+) {
   return repo.listFavoriteClips(userId, opts);
 }
 
@@ -12,7 +15,10 @@ export function unfavoriteClip(userId: number, clipId: number) {
   return repo.removeFavoriteClip(userId, clipId);
 }
 
-export function listMyFavoritePlaylists(userId: number, opts?: Parameters<typeof repo.listFavoritePlaylists>[1]) {
+export function listMyFavoritePlaylists(
+  userId: number,
+  opts?: Parameters<typeof repo.listFavoritePlaylists>[1],
+) {
   return repo.listFavoritePlaylists(userId, opts);
 }
 
@@ -23,4 +29,3 @@ export function favoritePlaylist(userId: number, playlistId: number) {
 export function unfavoritePlaylist(userId: number, playlistId: number) {
   return repo.removeFavoritePlaylist(userId, playlistId);
 }
-

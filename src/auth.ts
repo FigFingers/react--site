@@ -1,14 +1,16 @@
 // src/auth.ts (NextAuth v5, JWT session, PrismaAdapter)
-import NextAuth, { type DefaultSession } from "next-auth";
-import Google from "next-auth/providers/google";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import NextAuth from "next-auth";
+import Google from "next-auth/providers/google";
 import { prisma } from "@/server/db";
 
-// Session に user.id を追加（数値想定）
-declare module "next-auth" {
-  interface Session {
-    user: DefaultSession["user"] & { id: number };
-  }
+const googleClientId = process.env.AUTH_GOOGLE_ID;
+const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error(
+    "Google OAuth credentials (AUTH_GOOGLE_ID / AUTH_GOOGLE_SECRET) are not set",
+  );
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -20,8 +22,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   providers: [
     Google({
-      clientId: process.env.AUTH_GOOGLE_ID!,
-      clientSecret: process.env.AUTH_GOOGLE_SECRET!,
+      clientId: googleClientId,
+      clientSecret: googleClientSecret,
       authorization: {
         params: {
           prompt: "consent select_account",
@@ -32,21 +34,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
-    // JWT にユーザーIDを格納
+    // 🔹 JWT に必ず uid を載せる
     async jwt({ token, user }) {
-      if (user) {
-        // NextAuthのuser.idは number | string になり得るため数値化
-        const id = typeof user.id === "string" ? parseInt(user.id, 10) : (user.id as number);
-        (token as any).uid = id;
+      // ① 初回ログイン時（user がいるとき）は、素直に user.id を詰める
+      if (user && user.id != null) {
+        token.uid = String(user.id); // そのまま string
+      }
+
+      // ② それでも uid が無い場合は、email から DB を引いて補完する
+      if (token.uid == null && token.email) {
+        const dbUser = await prisma.user.findFirst({
+          where: {
+            email: token.email,
+            deletedAt: null, // ← 部分ユニークの条件と揃えれば安全
+          },
+          select: { id: true },
+        });
+
+        if (!dbUser) {
+          // ログイン済みなのにユーザーが取れないのは明らかに異常なので、ここで落として気付く
+          throw new Error("User not found for token.email");
+        }
+
+        token.uid = String(dbUser.id);
       }
       return token;
     },
-    // Session に id を反映
-    async session({ session, token }) {
-      if (session.user) {
-        const id = (token as any).uid;
-        (session.user as any).id = typeof id === "string" ? parseInt(id, 10) : (id as number);
+
+    // 🔹 Session に uid を反映するだけ
+    session({ session, token }) {
+      if (!session.user) return session;
+
+      if (token.uid == null) {
+        // jwt で必ずセットしている前提なので、入っていないのは異常
+        throw new Error("token.uid is missing in session callback");
       }
+
+      session.user.id = token.uid;
       return session;
     },
   },

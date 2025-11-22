@@ -1,70 +1,80 @@
-  {
-    "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
+{
+  "$schema": "https://biomejs.dev/schemas/2.2.4/schema.json",
 
-    "vcs": {
-      "enabled": true,
-      "clientKind": "git",
-      "useIgnoreFile": true
-    },
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
 
-    "files": {
-      "includes": ["**", "!node_modules", "!.next", "!dist", "!out", "!coverage"],
-      "ignoreUnknown": true
-    },
+  "files": {
+    "includes": ["**", "!node_modules", "!.next", "!dist", "!out", "!coverage"],
+    "ignoreUnknown": true
+  },
 
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineEnding": "lf",
+    "useEditorconfig": true
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "a11y": "warn",
+      "suspicious": "warn",
+      "security": "warn"
+    }
+  },
+
+  "javascript": {
     "formatter": {
-      "enabled": true,
-      "indentStyle": "space",
-      "indentWidth": 2,
-      "lineEnding": "lf",
-      "useEditorconfig": true
-    },
+      "quoteStyle": "double",
+      "jsxQuoteStyle": "double",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
 
-    "linter": {
-      "enabled": true,
-      "rules": {
-        "recommended": true,
-        "a11y": "warn",
-        "suspicious": "warn",
-        "security": "warn"
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+
+  "overrides": [
+    {
+      "includes": [".vscode/**"],
+      "json": {
+        "parser": { "allowComments": true, "allowTrailingCommas": true }
       }
     },
-
-    "javascript": {
-      "formatter": {
-        "quoteStyle": "double",
-        "jsxQuoteStyle": "double",
-        "trailingCommas": "all",
-        "semicolons": "always"
+    {
+      "includes": ["src/generated/**"],
+      "formatter": { "lineWidth": 160 },
+      "linter": { "enabled": false }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx"],
+      "javascript": {
+        "globals": ["describe", "it", "expect", "vi", "jest"]
       }
     },
-
-    "assist": {
-      "enabled": true,
-      "actions": {
-        "source": {
-          "organizeImports": "on"
+    {
+      "includes": ["**/*.d.ts"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noUselessEmptyExport": "off"
+          }
         }
       }
-    },
-
-    "overrides": [
-      {
-        "includes": [".vscode/**"],
-        "json": {
-          "parser": { "allowComments": true, "allowTrailingCommas": true }
-        }
-      },
-      {
-        "includes": ["src/generated/**"],
-        "formatter": { "lineWidth": 160 },
-        "linter": { "enabled": false }
-      },
-      {
-        "includes": ["**/*.test.ts", "**/*.test.tsx"],
-        "javascript": {
-          "globals": ["describe", "it", "expect", "vi", "jest"]
-        }
-      }
-    ]
-  }
+    }
+  ]
+}

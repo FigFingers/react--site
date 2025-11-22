@@ -1,10 +1,20 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
 
-export async function findById(id: number) {
+export function findById(id: number) {
   return prisma.user.findUnique({ where: { id } });
 }
 
-export async function list(opts: { page?: number; pageSize?: number; includeDeleted?: boolean; orderBy?: any } = {}) {
+export async function list(
+  opts: {
+    page?: number;
+    pageSize?: number;
+    includeDeleted?: boolean;
+    orderBy?:
+      | Prisma.UserOrderByWithRelationInput
+      | Prisma.UserOrderByWithRelationInput[];
+  } = {},
+) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 20;
   const where = opts.includeDeleted ? {} : { deletedAt: null };
@@ -20,19 +30,26 @@ export async function list(opts: { page?: number; pageSize?: number; includeDele
   return { data, total };
 }
 
-export async function create(data: { name?: string | null; email?: string | null; image?: string | null; region?: string | null }) {
+export function create(data: {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  region?: string | null;
+}) {
   return prisma.user.create({ data });
 }
 
-export async function update(id: number, data: { name?: string | null; image?: string | null; region?: string | null }) {
+export function update(
+  id: number,
+  data: { name?: string | null; image?: string | null; region?: string | null },
+) {
   return prisma.user.update({ where: { id }, data });
 }
 
-export async function softDelete(id: number) {
+export function softDelete(id: number) {
   return prisma.user.update({ where: { id }, data: { deletedAt: new Date() } });
 }
 
-export async function hardDelete(id: number) {
+export function hardDelete(id: number) {
   return prisma.user.delete({ where: { id } });
 }
-

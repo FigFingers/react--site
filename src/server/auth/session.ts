@@ -8,7 +8,7 @@ export function getSession() {
 
 export async function getCurrentUser() {
   const session = await auth();
-  const id = session?.user && (session.user as any).id;
+  const id = session?.user?.id;
   if (!id) return null;
   const userId = typeof id === "string" ? parseInt(id, 10) : id;
   if (!Number.isFinite(userId)) return null;

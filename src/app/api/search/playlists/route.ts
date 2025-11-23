@@ -1,45 +1,91 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
+const CHUNK_SIZE = 100;
+
 export async function GET(req: NextRequest): Promise<Response> {
   const { searchParams } = new URL(req.url);
-  const keyword: string = searchParams.get("q") ?? "";
-  const userId: string = searchParams.get("user") ?? "";
+
+  const keyword = searchParams.get("q") ?? "";
+  const userId = searchParams.get("user") ?? "";
+  const cursorParam = searchParams.get("cursor");
+
+  // cursor は number に確実に変換
+  const cursor = cursorParam ? Number(cursorParam) : null;
 
   try {
-    const playlists = await prisma.playlist.findMany({
-      where: {
-        name: {
-          contains: keyword,
-        },
-        ...(userId && { userId }),
+    // ----------------------------------------
+    // WHERE 条件
+    // ----------------------------------------
+    const whereClause: any = {
+      name: {
+        contains: keyword,
       },
+      ...(userId && { userId }),
+    };
+
+    // ----------------------------------------
+    // Prisma findMany with cursor pagination
+    // ----------------------------------------
+    const playlists = await prisma.playlist.findMany({
+      take: CHUNK_SIZE + 1, // 次の cursor 判定用に +1
+      ...(cursor
+        ? {
+            cursor: { id: cursor },
+            skip: 1,
+          }
+        : {}),
+      where: whereClause,
       include: {
         user: true,
       },
-      orderBy: {
-        id: "desc",
-      }
+      orderBy: { id: "desc" },
     });
 
-    // UI が期待している形式に変換する
-    const allReceivedData = playlists.map((p) => ({
-      my_list_name: p.name,
+    // ----------------------------------------
+    // nextCursor 判定
+    // ----------------------------------------
+    let nextCursor: number | null = null;
+
+    if (playlists.length > CHUNK_SIZE) {
+      const extra = playlists.pop()!;
+      nextCursor = extra.id;
+    }
+
+    // ----------------------------------------
+    // UI 期待形式にマッピング
+    // ----------------------------------------
+    const items = playlists.map((p) => ({
+      id: p.id,
+      name: p.name,                 // ← UI が期待する値
       user_name: p.user?.name ?? "unknown",
-      data: p.id,
+      data: String(p.id),           // PlayListDetailページに遷移する slug
     }));
 
-    return new Response(JSON.stringify({ allReceivedData }), {
-      status: 200,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
+    return new Response(
+      JSON.stringify({
+        items,
+        nextCursor,
+      }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
+        },
+      }
+    );
   } catch (error) {
     console.error("検索エラー:", error);
-    return new Response(JSON.stringify({ error: "検索に失敗しました" }), {
-      status: 500,
-    });
+
+    return new Response(
+      JSON.stringify({ error: "検索に失敗しました" }),
+      {
+        status: 500,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   }
 }

@@ -1,3 +1,5 @@
+// src/app/(site_data)/clipAppRouter/[id]/page.js
+// クリップ個別ページ　リダイレクト用
 import { redirect } from 'next/navigation';
 export const dynamic = 'force-dynamic';
 

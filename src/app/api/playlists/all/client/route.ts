@@ -1,4 +1,5 @@
 // src/app/api/playlists/all/client/route.ts
+// DRYに違反してそうなので消すかもしれませんが、一応残しておきます。
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 

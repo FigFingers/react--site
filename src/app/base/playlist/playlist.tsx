@@ -172,6 +172,7 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
       {/* Navigation */}
       <div className="flex gap-3 mt-4">
         <button
+          type="button"
           onClick={prevPage}
           disabled={visibleIndex === 0}
           className="px-4 py-2 rounded bg-gray-600 text-white disabled:bg-gray-400"
@@ -180,6 +181,7 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
         </button>
 
         <button
+          type="button"
           onClick={nextPage}
           disabled={cursor === null && visibleIndex + DISPLAY_SIZE >= cache.length}
           className="px-4 py-2 rounded bg-gray-600 text-white disabled:bg-gray-400"

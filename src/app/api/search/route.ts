@@ -15,7 +15,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const cursor = cursorParam ? Number(cursorParam) : null;
 
   console.log("cursorParam:", cursorParam);
-　console.log("parsed cursor:", cursor);
+  console.log("parsed cursor:", cursor);
 
   try {
     // ================

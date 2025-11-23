@@ -81,7 +81,7 @@ export default function HeadSearch() {
           onChange={handleInputChange}
           onKeyDown={handleKeyDown}
         />
-        <button onClick={handleSearch} className="search-icon">
+        <button type="button" onClick={handleSearch} className="search-icon">
           <SearchIcon />
         </button>
       </div>

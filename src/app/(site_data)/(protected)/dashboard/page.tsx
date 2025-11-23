@@ -1,4 +1,5 @@
 // src/app/(site_data)/(protected)/dashboard/page.tsx
+// ユーザープロフィール＆開発用データ表示ページ
 import React from 'react';
 import Image from "next/image";
 import { auth, signIn, signOut } from "@/auth";

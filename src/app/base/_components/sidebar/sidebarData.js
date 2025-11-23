@@ -26,7 +26,7 @@ export const SidebarData=[
     {
         title:"My_List",
         icon:<FolderIcon />,
-        link:"/mylist",
+        link:"/playlists",
 
     }
 ]

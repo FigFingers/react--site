@@ -48,7 +48,7 @@ interface PlaylistViewProps {
   userId: string | null;
 }
 export default function PlaylistView({ playlist, userId }: PlaylistViewProps) {
-　const isOwner = userId === playlist.userId;
+  const isOwner = userId === playlist.userId;
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   // PlaylistView.tsx の関数先頭あたり

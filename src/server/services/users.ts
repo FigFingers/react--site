@@ -28,3 +28,26 @@ export function deleteUser(currentUserId: number, id: number, hard = false) {
   if (currentUserId !== id) throw new ForbiddenError();
   return hard ? repo.hardDelete(id) : repo.softDelete(id);
 }
+
+export function listUserVods(
+  userId: number,
+  opts: Parameters<typeof repo.listUserVods>[1],
+) {
+  return repo.listUserVods(userId, opts);
+}
+
+export function addUserVod(currentUserId: number, id: number, vodId: number) {
+  if (currentUserId !== id) throw new ForbiddenError();
+  return repo.addUserVod(id, vodId);
+}
+
+export function removeUserVod(
+  currentUserId: number,
+  id: number,
+  vodId: number,
+) {
+  if (currentUserId !== id) throw new ForbiddenError();
+  return repo.removeUserVod(id, vodId).then((count) => {
+    if (count === 0) throw new NotFoundError("User VOD relation not found");
+  });
+}

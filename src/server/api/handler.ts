@@ -56,12 +56,22 @@ export function createApiHandler<
 
 export function createRouteHandlers<
   Params extends Record<string, string | string[]>,
->(handlers: HandlerMap<Params>) {
-  const apiHandler = createApiHandler(handlers);
-  const exports: Partial<Record<HttpMethod, ApiHandler<Params>>> = {};
+  H extends HandlerMap<Params>,
+>(handlers: H): { [K in keyof H]: ApiHandler<Params> } {
+  const apiHandler = createApiHandler<Params>(handlers);
 
-  for (const method of METHODS) {
-    if (handlers[method]) exports[method] = apiHandler;
+  // ここで「返すオブジェクトは H のキーだけを持つ」と宣言
+  const exports: { [K in keyof H]: ApiHandler<Params> } = {} as {
+    [K in keyof H]: ApiHandler<Params>;
+  };
+
+  // handlers に実際に定義されているキーだけを回す
+  for (const method of Object.keys(handlers) as (keyof H)[]) {
+    const fn = handlers[method];
+    if (typeof fn === "function") {
+      // method は keyof H なので、そのまま exports に代入できる
+      exports[method] = apiHandler;
+    }
   }
 
   return exports;

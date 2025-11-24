@@ -53,3 +53,36 @@ export function softDelete(id: number) {
 export function hardDelete(id: number) {
   return prisma.user.delete({ where: { id } });
 }
+
+export async function listUserVods(
+  userId: number,
+  opts: { page?: number; pageSize?: number } = {},
+) {
+  const page = opts.page ?? 1;
+  const pageSize = opts.pageSize ?? 20;
+  const where = { userId };
+  const [total, records] = await Promise.all([
+    prisma.userVod.count({ where }),
+    prisma.userVod.findMany({
+      where,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+      orderBy: { createdAt: "desc" },
+      include: { vod: true },
+    }),
+  ]);
+  return { data: records.map((record) => record.vod), total };
+}
+
+export function addUserVod(userId: number, vodId: number) {
+  return prisma.userVod.upsert({
+    where: { userId_vodId: { userId, vodId } },
+    update: {},
+    create: { userId, vodId },
+  });
+}
+
+export async function removeUserVod(userId: number, vodId: number) {
+  const result = await prisma.userVod.deleteMany({ where: { userId, vodId } });
+  return result.count;
+}

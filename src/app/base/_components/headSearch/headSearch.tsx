@@ -4,22 +4,30 @@ import Image from "next/image";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import SearchIcon from "@mui/icons-material/Search";
 import { useSession, signIn, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 export default function HeadSearch() {
   const [searchText, setSearchText] = useState("");
   const { data: session, status } = useSession();
+  const router = useRouter();
+
+
+  const handleSearch = () => {
+    const q = searchText.trim();
+    if (!q) return;
+
+    router.push(`/search?q=${encodeURIComponent(q)}`);
+    // ※ 検索結果ページで自動的に q を拾うため、ここで消す必要はない
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
   };
 
-  const handleClick = () => {
-    if (!searchText.trim()) {
-      alert("検索ワードを入力してください。");
-      return;
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      handleSearch();
     }
-    alert(`ボタンの内容: ${searchText}`);
-    setSearchText("");
   };
 
   const renderUserAvatar = () => {
@@ -71,8 +79,9 @@ export default function HeadSearch() {
           placeholder="Hinted search text"
           value={searchText}
           onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
         />
-        <button onClick={handleClick} className="search-icon">
+        <button type="button" onClick={handleSearch} className="search-icon">
           <SearchIcon />
         </button>
       </div>

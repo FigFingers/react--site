@@ -1,5 +1,5 @@
 import { createRouteHandlers } from "@/server/api/handler";
-import { requireUser } from "@/server/auth/session";
+import { requireUserId } from "@/server/auth/session";
 import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
 import {
@@ -8,15 +8,15 @@ import {
 } from "@/server/schemas/favorites.schema";
 import { favoriteClip, listMyFavoriteClips } from "@/server/services/favorites";
 
-const routeHandlers = createRouteHandlers({
+export const { GET, POST } = createRouteHandlers({
   GET: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const query = parseSearchParams(
       req.nextUrl.searchParams,
       favoriteListQuerySchema,
     );
     const pagination = parsePagination(query);
-    const { data, total } = await listMyFavoriteClips(user.id, {
+    const { data, total } = await listMyFavoriteClips(userId, {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
@@ -24,12 +24,9 @@ const routeHandlers = createRouteHandlers({
     return Response.json({ data, meta });
   },
   POST: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const body = await parseJsonBody(req, favoriteClipBodySchema);
-    await favoriteClip(user.id, body.clipId);
+    await favoriteClip(userId, body.clipId);
     return new Response(null, { status: 201 });
   },
 });
-
-export const GET = routeHandlers.GET!;
-export const POST = routeHandlers.POST!;

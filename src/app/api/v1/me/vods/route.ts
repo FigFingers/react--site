@@ -1,20 +1,20 @@
 import { createRouteHandlers } from "@/server/api/handler";
-import { requireUser } from "@/server/auth/session";
+import { requireUserId } from "@/server/auth/session";
 import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
 import { paginationQuerySchema } from "@/server/schemas/common";
 import { userVodBodySchema } from "@/server/schemas/users.schema";
 import { addUserVod, listUserVods } from "@/server/services/users";
 
-const routeHandlers = createRouteHandlers({
+export const { GET, POST } = createRouteHandlers({
   GET: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const query = parseSearchParams(
       req.nextUrl.searchParams,
       paginationQuerySchema,
     );
     const pagination = parsePagination(query);
-    const { data, total } = await listUserVods(user.id, {
+    const { data, total } = await listUserVods(userId, {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
@@ -22,12 +22,9 @@ const routeHandlers = createRouteHandlers({
     return Response.json({ data, meta });
   },
   POST: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const body = await parseJsonBody(req, userVodBodySchema);
-    await addUserVod(user.id, user.id, body.vodId);
+    await addUserVod(userId, userId, body.vodId);
     return new Response(null, { status: 201 });
   },
 });
-
-export const GET = routeHandlers.GET!;
-export const POST = routeHandlers.POST!;

@@ -1,5 +1,5 @@
 import { createRouteHandlers } from "@/server/api/handler";
-import { requireUser } from "@/server/auth/session";
+import { requireUserId } from "@/server/auth/session";
 import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
 import {
@@ -11,15 +11,15 @@ import {
   listMyFavoritePlaylists,
 } from "@/server/services/favorites";
 
-const routeHandlers = createRouteHandlers({
+export const { GET, POST } = createRouteHandlers({
   GET: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const query = parseSearchParams(
       req.nextUrl.searchParams,
       favoriteListQuerySchema,
     );
     const pagination = parsePagination(query);
-    const { data, total } = await listMyFavoritePlaylists(user.id, {
+    const { data, total } = await listMyFavoritePlaylists(userId, {
       page: pagination.page,
       pageSize: pagination.pageSize,
     });
@@ -27,12 +27,9 @@ const routeHandlers = createRouteHandlers({
     return Response.json({ data, meta });
   },
   POST: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const body = await parseJsonBody(req, favoritePlaylistBodySchema);
-    await favoritePlaylist(user.id, body.playlistId);
+    await favoritePlaylist(userId, body.playlistId);
     return new Response(null, { status: 201 });
   },
 });
-
-export const GET = routeHandlers.GET!;
-export const POST = routeHandlers.POST!;

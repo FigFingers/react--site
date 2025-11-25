@@ -1,14 +1,14 @@
 import { createRouteHandlers } from "@/server/api/handler";
-import { requireUser } from "@/server/auth/session";
+import { requireUserId } from "@/server/auth/session";
 import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
 import { paginationQuerySchema } from "@/server/schemas/common";
 import { playlistCreateBodySchema } from "@/server/schemas/playlists.schema";
 import { createPlaylist, listPlaylists } from "@/server/services/playlists";
 
-const routeHandlers = createRouteHandlers({
+export const { GET, POST } = createRouteHandlers({
   GET: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const query = parseSearchParams(
       req.nextUrl.searchParams,
       paginationQuerySchema,
@@ -18,18 +18,15 @@ const routeHandlers = createRouteHandlers({
       page: pagination.page,
       pageSize: pagination.pageSize,
       includeDeleted: false,
-      userId: user.id,
+      userId: userId,
     });
     const meta = buildPaginationMeta(pagination, total);
     return Response.json({ data, meta });
   },
   POST: async (req) => {
-    const user = await requireUser();
+    const userId = await requireUserId();
     const body = await parseJsonBody(req, playlistCreateBodySchema);
-    const playlist = await createPlaylist(user.id, body);
+    const playlist = await createPlaylist(userId, body);
     return Response.json(playlist, { status: 201 });
   },
 });
-
-export const GET = routeHandlers.GET!;
-export const POST = routeHandlers.POST!;

@@ -44,11 +44,11 @@
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx}": [
-      "biome format --write",
+      "biome format --write --no-errors-on-unmatched",
       "biome check"
     ],
     "*.{json,md,css,scss}": [
-      "biome format --write"
+      "biome format --write --no-errors-on-unmatched"
     ]
   }
 }

@@ -13,6 +13,9 @@ function Clip({ name, title, epnum, username, icon,  url ,starttime, endtime , u
     case "prime":
       urlLink = "https://www.amazon.co.jp/primevideo" + url;
       break;
+    case "DisneyPlus":
+      urlLink = url;
+      break;
     default:
       urlLink = null;
   }
@@ -32,6 +35,7 @@ function Clip({ name, title, epnum, username, icon,  url ,starttime, endtime , u
     });
     window.dispatchEvent(event);
 
+    console.log("urlLink:", urlLink);
     if (urlLink) {
       window.open(urlLink + (urlLink.includes('?') ? '&' : '?') + "t=" + starttime, "_blank");
     } else {

@@ -2,7 +2,7 @@
   "name": "my-app2",
   "version": "0.1.0",
   "private": true,
-  "engages": {
+  "engines": {
     "node": ">=24.0.0 <25"
   },
   "scripts": {
@@ -19,27 +19,29 @@
     "@auth/prisma-adapter": "^2.11.1",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
-    "@mui/icons-material": "^7.3.5",
-    "@mui/material": "^7.3.5",
-    "@prisma/adapter-pg": "^7.0.0",
-    "@prisma/client": "^7.0.0",
-    "next": "^16.0.3",
+    "@mui/icons-material": "^7.3.6",
+    "@mui/material": "^7.3.6",
+    "@prisma/adapter-pg": "^7.1.0",
+    "@prisma/client": "^7.1.0",
+    "next": "^16.0.9",
     "next-auth": "^5.0.0-beta.29",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "zod": "^4.1.12"
+    "react": "^19.2.2",
+    "react-dom": "^19.2.2",
+    "zod": "^4.1.13"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.3.7",
-    "@prisma/generator-helper": "^7.0.0",
-    "@prisma/internals": "^7.0.0",
-    "@types/node": "^24.10.1",
-    "@types/react": "^19.2.6",
+    "@biomejs/biome": "^2.3.8",
+    "@lavamoat/allow-scripts": "^3.4.1",
+    "@lavamoat/preinstall-always-fail": "^2.1.1",
+    "@prisma/generator-helper": "^7.1.0",
+    "@prisma/internals": "^7.1.0",
+    "@types/node": "^24.10.2",
+    "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prisma": "^7.0.0",
-    "tsx": "^4.20.6",
+    "prisma": "^7.1.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },
   "lint-staged": {
@@ -50,5 +52,14 @@
     "*.{json,md,css,scss}": [
       "biome format --write --no-errors-on-unmatched"
     ]
+  },
+  "lavamoat": {
+    "allowScripts": {
+      "@lavamoat/preinstall-always-fail": false,
+      "next>sharp": false,
+      "prisma": false,
+      "prisma>@prisma/engines": false,
+      "tsx>esbuild": false
+    }
   }
 }

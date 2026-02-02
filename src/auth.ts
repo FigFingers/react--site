@@ -10,6 +10,15 @@ declare module "next-auth" {
   }
 }
 
+// 推測: HTTPS で運用する本番環境では secure を有効化し、開発時は無効化する。
+const isProd =
+  process.env.NODE_ENV === "production" ||
+  (process.env.NEXTAUTH_URL ?? "").startsWith("https://");
+
+const sessionCookieName = isProd
+  ? "__Secure-authjs.session-token"
+  : "authjs.session-token";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
 
@@ -17,6 +26,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
 
   trustHost: true,
+
+  cookies: {
+    sessionToken: {
+      name: sessionCookieName,
+      options: {
+        httpOnly: true,
+        sameSite: "none",
+        path: "/",
+        secure: isProd,
+      },
+    },
+  },
 
   providers: [
     Google({
@@ -47,4 +68,3 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
 });
-

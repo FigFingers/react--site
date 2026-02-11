@@ -10,8 +10,8 @@ import {
 } from "@/server/schemas/common";
 
 export const playlistListQuerySchema = paginationQuerySchema
-  .merge(includeDeletedQuerySchema)
-  .merge(sortQuerySchema.partial())
+  .extend(includeDeletedQuerySchema.shape)
+  .extend(sortQuerySchema.shape)
   .extend({
     userId: idSchema.optional(),
     name: z.string().optional(),

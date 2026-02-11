@@ -25,7 +25,7 @@ export const clipCreateBodySchema = z
     title: z.string().min(1),
     startMs: z.number().int().min(0),
     endMs: z.number().int().min(0),
-    url: z.string().url(),
+    url: z.url(),
     epnum: z.string().nullable().optional(),
   })
   .strict();
@@ -37,7 +37,7 @@ export const clipUpdateBodySchema = nonEmptyBody(
       title: z.string().min(1).optional(),
       startMs: z.number().int().min(0).optional(),
       endMs: z.number().int().min(0).optional(),
-      url: z.string().url().optional(),
+      url: z.url().optional(),
       epnum: z.string().nullable().optional(),
     })
     .strict(),

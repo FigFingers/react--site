@@ -4,7 +4,7 @@ import { parseRouteParams } from "@/server/http/validation";
 import { vodIdParamSchema } from "@/server/schemas/vods.schema";
 import { removeUserVod } from "@/server/services/users";
 
-const routeHandlers = createRouteHandlers({
+export const { DELETE } = createRouteHandlers({
   DELETE: async (_req, context) => {
     const user = await requireUser();
     const params = parseRouteParams(context.params, vodIdParamSchema);
@@ -12,5 +12,3 @@ const routeHandlers = createRouteHandlers({
     return new Response(null, { status: 204 });
   },
 });
-
-export const DELETE = routeHandlers.DELETE!;

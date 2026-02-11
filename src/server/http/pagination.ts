@@ -22,6 +22,8 @@ export interface PaginationMeta {
   pageSize: number;
   total: number;
   totalPages: number;
+  hasPrev: boolean;
+  hasNext: boolean;
 }
 
 export function parsePagination(init: PaginationInit = {}): PaginationParams {
@@ -47,7 +49,17 @@ export function buildPaginationMeta(
 ): PaginationMeta {
   const safeTotal = Math.max(0, Math.floor(total));
   const totalPages = pageSize > 0 ? Math.ceil(safeTotal / pageSize) : 0;
-  return { page, pageSize, total: safeTotal, totalPages };
+  const safePage =
+    totalPages === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
+
+  return {
+    page: safePage,
+    pageSize,
+    total: safeTotal,
+    totalPages,
+    hasPrev: safePage > 1,
+    hasNext: totalPages > 0 && safePage < totalPages,
+  };
 }
 
 function toNumber(

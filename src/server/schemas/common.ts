@@ -23,8 +23,8 @@ export const hardDeleteQuerySchema = z.object({
   hard: z.coerce.boolean().optional().default(false),
 });
 
-export const paginatedQuerySchema = paginationQuerySchema.merge(
-  sortQuerySchema.partial(),
+export const paginatedQuerySchema = paginationQuerySchema.extend(
+  sortQuerySchema.shape,
 );
 
 export const nullableString = (max?: number) =>
@@ -33,8 +33,7 @@ export const nullableString = (max?: number) =>
 export const optionalString = (max?: number) =>
   (max ? z.string().max(max) : z.string()).optional();
 
-export const urlString = (max?: number) =>
-  max ? z.string().url().max(max) : z.string().url();
+export const urlString = (max?: number) => (max ? z.url().max(max) : z.url());
 
 export const pageParamSchema = z.object({
   page: paginationQuerySchema.shape.page,

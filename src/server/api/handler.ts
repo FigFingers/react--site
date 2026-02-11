@@ -28,7 +28,7 @@ type NextRouteContext<
     string | string[]
   >,
 > = {
-  params: Promise<Params>;
+  params: Params | Promise<Params>;
 };
 
 /**
@@ -62,17 +62,23 @@ type NextApiHandler<
 export type HandlerMap<Params extends Record<string, string | string[]>> =
   Partial<Record<HttpMethod, ApiHandler<Params>>>;
 
+function isHttpMethod(value: string): value is HttpMethod {
+  return (METHODS as readonly string[]).includes(value);
+}
+
 /**
  * HandlerMap（自前ハンドラ群）から
  * Next.js が期待する型のハンドラ（NextApiHandler）を作る
  */
 export function createApiHandler<
-  Params extends Record<string, string | string[]>,
+  Params extends Record<string, string | string[]> = Record<
+    string,
+    string | string[]
+  >,
 >(handlers: HandlerMap<Params>): NextApiHandler<Params> {
-  const allowHeader = Object.entries(handlers)
-    .filter(([, fn]) => typeof fn === "function")
-    .map(([method]) => method)
-    .join(", ");
+  const allowHeader = METHODS.filter(
+    (m) => typeof handlers[m] === "function",
+  ).join(", ");
 
   // ここが Next.js から直接呼ばれるハンドラ
   return async function handler(
@@ -85,9 +91,27 @@ export function createApiHandler<
       params: await nextContext.params,
     };
 
-    const method = req.method.toUpperCase() as HttpMethod;
-    const fn = handlers[method];
+    const methodRaw = req.method.toUpperCase();
 
+    // 未知のメソッドは 405（Allow が分かるなら付ける）
+    if (!isHttpMethod(methodRaw)) {
+      return new Response(null, {
+        status: 405,
+        headers: allowHeader ? { Allow: allowHeader } : undefined,
+      });
+    }
+
+    const method: HttpMethod = methodRaw; // ここから先は HttpMethod として扱える
+
+    // OPTIONS はデフォルトで返す（ただし上書きがあれば優先）
+    if (method === "OPTIONS" && typeof handlers.OPTIONS !== "function") {
+      return new Response(null, {
+        status: 204,
+        headers: allowHeader ? { Allow: allowHeader } : undefined,
+      });
+    }
+
+    const fn = handlers[method];
     if (!fn) {
       return new Response(null, {
         status: 405,
@@ -109,8 +133,11 @@ export function createApiHandler<
  * 返り値の型は NextApiHandler になる（＝Next の期待どおり）
  */
 export function createRouteHandlers<
-  Params extends Record<string, string | string[]>,
-  H extends HandlerMap<Params>,
+  Params extends Record<string, string | string[]> = Record<
+    string,
+    string | string[]
+  >,
+  H extends HandlerMap<Params> = HandlerMap<Params>,
 >(handlers: H): { [K in keyof H]: NextApiHandler<Params> } {
   const apiHandler = createApiHandler<Params>(handlers);
 

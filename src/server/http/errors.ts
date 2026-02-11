@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 type JsonValue =
   | string
   | number
@@ -78,8 +80,63 @@ export function toErrorPayload(err: unknown): {
       body: { message: err.message, code: err.code, details },
     };
   }
+
+  const prismaMapped = mapPrismaError(err);
+  if (prismaMapped) {
+    const details = sanitizeJson(prismaMapped.details);
+    return {
+      status: prismaMapped.status,
+      body: {
+        message: prismaMapped.message,
+        code: prismaMapped.code,
+        details,
+      },
+    };
+  }
+
   const message = err instanceof Error ? err.message : "Unexpected error";
   return { status: 500, body: { message, code: "INTERNAL_ERROR" } };
+}
+
+function mapPrismaError(err: unknown): HttpError | null {
+  if (err instanceof Prisma.PrismaClientValidationError) {
+    return new BadRequestError(
+      "Invalid database query",
+      "PRISMA_VALIDATION_ERROR",
+    );
+  }
+
+  if (!(err instanceof Prisma.PrismaClientKnownRequestError)) {
+    return null;
+  }
+
+  switch (err.code) {
+    case "P2000":
+    case "P2006":
+    case "P2011":
+      return new BadRequestError("Invalid input", err.code, {
+        prismaCode: err.code,
+        meta: err.meta,
+      });
+    case "P2002":
+      return new ConflictError("Unique constraint violation", err.code, {
+        prismaCode: err.code,
+        meta: err.meta,
+      });
+    case "P2003":
+    case "P2014":
+      return new ConflictError("Relation constraint violation", err.code, {
+        prismaCode: err.code,
+        meta: err.meta,
+      });
+    case "P2025":
+      return new NotFoundError("Resource not found", err.code, {
+        prismaCode: err.code,
+        meta: err.meta,
+      });
+    default:
+      return null;
+  }
 }
 
 function sanitizeJson(v: unknown): JsonValue {

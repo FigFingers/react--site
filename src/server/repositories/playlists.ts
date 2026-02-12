@@ -1,6 +1,6 @@
-import type { Clip, Playlist, Prisma, Vod } from "@prisma/client";
+import type { Clip, Prisma, Vod } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { makePageMeta, normalizePaging } from "@/server/utils/pagination";
+import { parsePagination } from "@/server/http/pagination";
 
 export function findById(id: number) {
   return prisma.playlist.findUnique({ where: { id } });
@@ -18,7 +18,7 @@ export async function list(
       | Prisma.PlaylistOrderByWithRelationInput[];
   } = {},
 ) {
-  const { page, pageSize, skip, take } = normalizePaging(opts);
+  const { page, pageSize, skip, take } = parsePagination(opts);
   const where: Prisma.PlaylistWhereInput = {};
   if (!opts.includeDeleted) where.deletedAt = null;
   if (opts.userId != null) where.userId = opts.userId;
@@ -33,7 +33,7 @@ export async function list(
       orderBy: opts.orderBy ?? { createdAt: "desc" },
     }),
   ]);
-  return makePageMeta<Playlist>({ data, total, page, pageSize });
+  return { data, total, page, pageSize };
 }
 
 export function create(data: { userId: number; name: string }) {
@@ -73,7 +73,7 @@ export async function listClips(
   playlistId: number,
   opts: { page?: number; pageSize?: number } = {},
 ) {
-  const { page, pageSize, skip, take } = normalizePaging(opts);
+  const { page, pageSize, skip, take } = parsePagination(opts);
   const where: Prisma.ClipPlaylistWhereInput = {
     playlistId,
     clip: { deletedAt: null },
@@ -89,7 +89,7 @@ export async function listClips(
     }),
   ]);
   const data = rels.map((r) => r.clip) as Clip[];
-  return makePageMeta<Clip>({ data, total, page, pageSize });
+  return { data, total, page, pageSize };
 }
 
 export function addVod(playlistId: number, vodId: number) {
@@ -106,7 +106,7 @@ export async function listVods(
   playlistId: number,
   opts: { page?: number; pageSize?: number } = {},
 ) {
-  const { page, pageSize, skip, take } = normalizePaging(opts);
+  const { page, pageSize, skip, take } = parsePagination(opts);
   const where: Prisma.PlaylistVodWhereInput = {
     playlistId,
     vod: { deletedAt: null },
@@ -122,7 +122,7 @@ export async function listVods(
     }),
   ]);
   const data = rels.map((r) => r.vod) as Vod[];
-  return makePageMeta<Vod>({ data, total, page, pageSize });
+  return { data, total, page, pageSize };
 }
 
 export async function hasActiveClip(clipId: number) {

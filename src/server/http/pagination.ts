@@ -24,12 +24,19 @@ export interface PaginationMeta {
   totalPages: number;
   hasPrev: boolean;
   hasNext: boolean;
+  outOfRange: boolean;
 }
 
 export function parsePagination(init: PaginationInit = {}): PaginationParams {
-  const defaultPage = init.defaultPage ?? DEFAULT_PAGE;
-  const defaultPageSize = init.defaultPageSize ?? DEFAULT_PAGE_SIZE;
-  const maxPageSize = init.maxPageSize ?? DEFAULT_MAX_PAGE_SIZE;
+  const defaultPage = clampInt(toNumber(init.defaultPage, DEFAULT_PAGE), 1);
+  const defaultPageSize = clampInt(
+    toNumber(init.defaultPageSize, DEFAULT_PAGE_SIZE),
+    1,
+  );
+  const maxPageSize = clampInt(
+    toNumber(init.maxPageSize, DEFAULT_MAX_PAGE_SIZE),
+    1,
+  );
 
   const page = clampInt(toNumber(init.page, defaultPage), 1);
   const rawPageSize = clampInt(toNumber(init.pageSize, defaultPageSize), 1);
@@ -49,16 +56,16 @@ export function buildPaginationMeta(
 ): PaginationMeta {
   const safeTotal = Math.max(0, Math.floor(total));
   const totalPages = pageSize > 0 ? Math.ceil(safeTotal / pageSize) : 0;
-  const safePage =
-    totalPages === 0 ? 1 : Math.min(Math.max(1, page), totalPages);
+  const outOfRange = totalPages > 0 && page > totalPages;
 
   return {
-    page: safePage,
+    page,
     pageSize,
     total: safeTotal,
     totalPages,
-    hasPrev: safePage > 1,
-    hasNext: totalPages > 0 && safePage < totalPages,
+    hasPrev: totalPages > 0 && page > 1,
+    hasNext: totalPages > 0 && page < totalPages,
+    outOfRange,
   };
 }
 
@@ -66,9 +73,12 @@ function toNumber(
   value: number | string | null | undefined,
   fallback: number,
 ): number {
-  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "number" && Number.isFinite(value))
+    return Number.isInteger(value) ? value : fallback;
   if (typeof value === "string" && value.trim() !== "") {
-    const parsed = Number(value);
+    const normalized = value.trim();
+    if (!/^-?\d+$/.test(normalized)) return fallback;
+    const parsed = Number.parseInt(normalized, 10);
     if (Number.isFinite(parsed)) return parsed;
   }
   return fallback;

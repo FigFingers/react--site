@@ -74,7 +74,10 @@ export async function listClips(
   opts: { page?: number; pageSize?: number } = {},
 ) {
   const { page, pageSize, skip, take } = normalizePaging(opts);
-  const where: Prisma.ClipPlaylistWhereInput = { playlistId };
+  const where: Prisma.ClipPlaylistWhereInput = {
+    playlistId,
+    clip: { deletedAt: null },
+  };
   const [total, rels] = await Promise.all([
     prisma.clipPlaylist.count({ where }),
     prisma.clipPlaylist.findMany({
@@ -104,7 +107,10 @@ export async function listVods(
   opts: { page?: number; pageSize?: number } = {},
 ) {
   const { page, pageSize, skip, take } = normalizePaging(opts);
-  const where: Prisma.PlaylistVodWhereInput = { playlistId };
+  const where: Prisma.PlaylistVodWhereInput = {
+    playlistId,
+    vod: { deletedAt: null },
+  };
   const [total, rels] = await Promise.all([
     prisma.playlistVod.count({ where }),
     prisma.playlistVod.findMany({
@@ -117,4 +123,18 @@ export async function listVods(
   ]);
   const data = rels.map((r) => r.vod) as Vod[];
   return makePageMeta<Vod>({ data, total, page, pageSize });
+}
+
+export async function hasActiveClip(clipId: number) {
+  const count = await prisma.clip.count({
+    where: { id: clipId, deletedAt: null },
+  });
+  return count > 0;
+}
+
+export async function hasActiveVod(vodId: number) {
+  const count = await prisma.vod.count({
+    where: { id: vodId, deletedAt: null },
+  });
+  return count > 0;
 }

@@ -45,6 +45,8 @@ export async function addClipToPlaylist(
 ) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  const clipExists = await repo.hasActiveClip(clipId);
+  if (!clipExists) throw new NotFoundError("Clip not found");
   return repo.addClip(playlistId, clipId);
 }
 
@@ -72,6 +74,8 @@ export async function addVodToPlaylist(
 ) {
   const playlist = await getPlaylist(playlistId);
   if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  const vodExists = await repo.hasActiveVod(vodId);
+  if (!vodExists) throw new NotFoundError("VOD not found");
   return repo.addVod(playlistId, vodId);
 }
 

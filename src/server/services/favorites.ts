@@ -1,3 +1,4 @@
+import { NotFoundError } from "@/server/http/errors";
 import * as repo from "@/server/repositories/favorites";
 
 export function listMyFavoriteClips(
@@ -8,7 +9,10 @@ export function listMyFavoriteClips(
 }
 
 export function favoriteClip(userId: number, clipId: number) {
-  return repo.addFavoriteClip(userId, clipId);
+  return repo.hasActiveClip(clipId).then((exists) => {
+    if (!exists) throw new NotFoundError("Clip not found");
+    return repo.addFavoriteClip(userId, clipId);
+  });
 }
 
 export function unfavoriteClip(userId: number, clipId: number) {
@@ -23,7 +27,10 @@ export function listMyFavoritePlaylists(
 }
 
 export function favoritePlaylist(userId: number, playlistId: number) {
-  return repo.addFavoritePlaylist(userId, playlistId);
+  return repo.hasActivePlaylist(playlistId).then((exists) => {
+    if (!exists) throw new NotFoundError("Playlist not found");
+    return repo.addFavoritePlaylist(userId, playlistId);
+  });
 }
 
 export function unfavoritePlaylist(userId: number, playlistId: number) {

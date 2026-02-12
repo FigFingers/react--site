@@ -6,7 +6,10 @@ export async function listFavoriteClips(
 ) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 20;
-  const where = { userId };
+  const where = {
+    userId,
+    clip: { deletedAt: null },
+  };
   const [total, rels] = await Promise.all([
     prisma.favoriteClip.count({ where }),
     prisma.favoriteClip.findMany({
@@ -36,7 +39,10 @@ export async function listFavoritePlaylists(
 ) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 20;
-  const where = { userId };
+  const where = {
+    userId,
+    playlist: { deletedAt: null },
+  };
   const [total, rels] = await Promise.all([
     prisma.favoritePlaylist.count({ where }),
     prisma.favoritePlaylist.findMany({
@@ -52,6 +58,20 @@ export async function listFavoritePlaylists(
 
 export function addFavoritePlaylist(userId: number, playlistId: number) {
   return prisma.favoritePlaylist.create({ data: { userId, playlistId } });
+}
+
+export async function hasActiveClip(clipId: number) {
+  const count = await prisma.clip.count({
+    where: { id: clipId, deletedAt: null },
+  });
+  return count > 0;
+}
+
+export async function hasActivePlaylist(playlistId: number) {
+  const count = await prisma.playlist.count({
+    where: { id: playlistId, deletedAt: null },
+  });
+  return count > 0;
 }
 
 export function removeFavoritePlaylist(userId: number, playlistId: number) {

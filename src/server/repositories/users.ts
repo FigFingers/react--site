@@ -60,7 +60,10 @@ export async function listUserVods(
 ) {
   const page = opts.page ?? 1;
   const pageSize = opts.pageSize ?? 20;
-  const where = { userId };
+  const where: Prisma.UserVodWhereInput = {
+    userId,
+    vod: { deletedAt: null },
+  };
   const [total, records] = await Promise.all([
     prisma.userVod.count({ where }),
     prisma.userVod.findMany({
@@ -80,6 +83,13 @@ export function addUserVod(userId: number, vodId: number) {
     update: {},
     create: { userId, vodId },
   });
+}
+
+export async function hasActiveVod(vodId: number) {
+  const count = await prisma.vod.count({
+    where: { id: vodId, deletedAt: null },
+  });
+  return count > 0;
 }
 
 export async function removeUserVod(userId: number, vodId: number) {

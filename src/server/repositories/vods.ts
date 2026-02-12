@@ -7,8 +7,8 @@ export function findById(id: number) {
 
 export async function list(
   opts: {
-    page?: number;
-    pageSize?: number;
+    skip?: number;
+    take?: number;
     includeDeleted?: boolean;
     code?: string;
     name?: string;
@@ -17,8 +17,8 @@ export async function list(
       | Prisma.VodOrderByWithRelationInput[];
   } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.VodWhereInput = {};
   if (!opts.includeDeleted) where.deletedAt = null;
   if (opts.code) where.code = { contains: opts.code, mode: "insensitive" };
@@ -27,8 +27,8 @@ export async function list(
     prisma.vod.count({ where }),
     prisma.vod.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: opts.orderBy ?? { createdAt: "desc" },
     }),
   ]);
@@ -53,17 +53,17 @@ export function hardDelete(id: number) {
 
 export async function listAliases(
   vodId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where = { vodId };
   const [total, data] = await Promise.all([
     prisma.vodAlias.count({ where }),
     prisma.vodAlias.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: { createdAt: "desc" },
     }),
   ]);

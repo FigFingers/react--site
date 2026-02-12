@@ -7,23 +7,23 @@ export function findById(id: number) {
 
 export async function list(
   opts: {
-    page?: number;
-    pageSize?: number;
+    skip?: number;
+    take?: number;
     includeDeleted?: boolean;
     orderBy?:
       | Prisma.UserOrderByWithRelationInput
       | Prisma.UserOrderByWithRelationInput[];
   } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where = opts.includeDeleted ? {} : { deletedAt: null };
   const [total, data] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: opts.orderBy ?? { createdAt: "desc" },
     }),
   ]);
@@ -56,10 +56,10 @@ export function hardDelete(id: number) {
 
 export async function listUserVods(
   userId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.UserVodWhereInput = {
     userId,
     vod: { deletedAt: null },
@@ -68,8 +68,8 @@ export async function listUserVods(
     prisma.userVod.count({ where }),
     prisma.userVod.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: { createdAt: "desc" },
       include: { vod: true },
     }),

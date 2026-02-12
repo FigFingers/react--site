@@ -17,8 +17,8 @@ export const { GET, POST } = createRouteHandlers({
     );
     const pagination = parsePagination(query);
     const { data, total } = await listMyFavoriteClips(userId, {
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      skip: pagination.skip,
+      take: pagination.take,
     });
     const meta = buildPaginationMeta(pagination, total);
     return Response.json({ data, meta });

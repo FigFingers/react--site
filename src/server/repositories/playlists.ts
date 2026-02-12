@@ -1,6 +1,5 @@
 import type { Clip, Prisma, Vod } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { parsePagination } from "@/server/http/pagination";
 
 export function findById(id: number) {
   return prisma.playlist.findUnique({ where: { id } });
@@ -8,8 +7,8 @@ export function findById(id: number) {
 
 export async function list(
   opts: {
-    page?: number;
-    pageSize?: number;
+    skip?: number;
+    take?: number;
     includeDeleted?: boolean;
     userId?: number;
     name?: string;
@@ -18,7 +17,8 @@ export async function list(
       | Prisma.PlaylistOrderByWithRelationInput[];
   } = {},
 ) {
-  const { page, pageSize, skip, take } = parsePagination(opts);
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.PlaylistWhereInput = {};
   if (!opts.includeDeleted) where.deletedAt = null;
   if (opts.userId != null) where.userId = opts.userId;
@@ -33,7 +33,7 @@ export async function list(
       orderBy: opts.orderBy ?? { createdAt: "desc" },
     }),
   ]);
-  return { data, total, page, pageSize };
+  return { data, total };
 }
 
 export function create(data: { userId: number; name: string }) {
@@ -71,9 +71,10 @@ export function removeClip(playlistId: number, clipId: number) {
 
 export async function listClips(
   playlistId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const { page, pageSize, skip, take } = parsePagination(opts);
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.ClipPlaylistWhereInput = {
     playlistId,
     clip: { deletedAt: null },
@@ -89,7 +90,7 @@ export async function listClips(
     }),
   ]);
   const data = rels.map((r) => r.clip) as Clip[];
-  return { data, total, page, pageSize };
+  return { data, total };
 }
 
 export function addVod(playlistId: number, vodId: number) {
@@ -104,9 +105,10 @@ export function removeVod(playlistId: number, vodId: number) {
 
 export async function listVods(
   playlistId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const { page, pageSize, skip, take } = parsePagination(opts);
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.PlaylistVodWhereInput = {
     playlistId,
     vod: { deletedAt: null },
@@ -122,7 +124,7 @@ export async function listVods(
     }),
   ]);
   const data = rels.map((r) => r.vod) as Vod[];
-  return { data, total, page, pageSize };
+  return { data, total };
 }
 
 export async function hasActiveClip(clipId: number) {

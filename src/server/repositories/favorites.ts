@@ -2,10 +2,10 @@ import { prisma } from "@/server/db";
 
 export async function listFavoriteClips(
   userId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where = {
     userId,
     clip: { deletedAt: null },
@@ -14,8 +14,8 @@ export async function listFavoriteClips(
     prisma.favoriteClip.count({ where }),
     prisma.favoriteClip.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: { createdAt: "desc" },
       include: { clip: true },
     }),
@@ -35,10 +35,10 @@ export function removeFavoriteClip(userId: number, clipId: number) {
 
 export async function listFavoritePlaylists(
   userId: number,
-  opts: { page?: number; pageSize?: number } = {},
+  opts: { skip?: number; take?: number } = {},
 ) {
-  const page = opts.page ?? 1;
-  const pageSize = opts.pageSize ?? 20;
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where = {
     userId,
     playlist: { deletedAt: null },
@@ -47,8 +47,8 @@ export async function listFavoritePlaylists(
     prisma.favoritePlaylist.count({ where }),
     prisma.favoritePlaylist.findMany({
       where,
-      skip: (page - 1) * pageSize,
-      take: pageSize,
+      skip,
+      take,
       orderBy: { createdAt: "desc" },
       include: { playlist: true },
     }),

@@ -1,6 +1,5 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
-import { parsePagination } from "@/server/http/pagination";
 
 export function findById(id: number) {
   return prisma.clip.findUnique({ where: { id } });
@@ -8,8 +7,8 @@ export function findById(id: number) {
 
 export async function list(
   opts: {
-    page?: number;
-    pageSize?: number;
+    skip?: number;
+    take?: number;
     includeDeleted?: boolean;
     userId?: number;
     vodId?: number;
@@ -19,7 +18,8 @@ export async function list(
       | Prisma.ClipOrderByWithRelationInput[];
   } = {},
 ) {
-  const { page, pageSize, skip, take } = parsePagination(opts);
+  const skip = opts.skip ?? 0;
+  const take = opts.take ?? 20;
   const where: Prisma.ClipWhereInput = {};
   if (!opts.includeDeleted) where.deletedAt = null;
   if (opts.userId != null) where.userId = opts.userId;
@@ -35,7 +35,7 @@ export async function list(
       orderBy: opts.orderBy ?? { createdAt: "desc" },
     }),
   ]);
-  return { data, total, page, pageSize };
+  return { data, total };
 }
 
 export function create(data: {

@@ -15,8 +15,8 @@ export const { GET, POST } = createRouteHandlers({
     );
     const pagination = parsePagination(query);
     const { data, total } = await listPlaylists({
-      page: pagination.page,
-      pageSize: pagination.pageSize,
+      skip: pagination.skip,
+      take: pagination.take,
       includeDeleted: false,
       userId: userId,
     });

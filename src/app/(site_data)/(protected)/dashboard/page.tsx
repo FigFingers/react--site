@@ -1,126 +1,124 @@
-// src/app/(site_data)/(protected)/dashboard/page.tsx
-import React from 'react';
-import Image from "next/image";
-import { auth, signIn, signOut } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { signIn, signOut } from "@/auth";
+import { getCurrentUser, getSession } from "@/server/auth/session";
+import { prisma } from "@/server/db";
 
-export const dynamic = "force-dynamic"; // キャッシュ無効（常に最新）
+export const dynamic = "force-dynamic";
 
-// マスクユーティリティ（トークンなどの秘匿値）
-function mask(value: unknown, visible = 4) {
-  if (typeof value !== "string" || value.length <= visible) return value ?? null;
-  return `${value.slice(0, visible)}••••••••`;
-}
+export default async function DashboardPage() {
+  const [session, currentUser] = await Promise.all([
+    getSession(),
+    getCurrentUser(),
+  ]);
 
-export default async function MePage() {
-  const session = await auth();
-
-  // 未ログインなら Sign in ボタンだけ表示（サーバーアクション）
-  if (!session?.user) {
+  if (!session?.user || !currentUser) {
     return (
-      <main className="mx-auto max-w-xl p-6">
-        <h1 className="text-xl font-semibold mb-4">ユーザー情報</h1>
-        <form
-          action={async () => {
-            "use server";
-            await signIn("google");
-          }}
-        >
-          <button className="rounded-lg border px-4 py-2">Sign in with Google</button>
-        </form>
+      <main className="main-content">
+        <section className="user-info">
+          <h3>ダッシュボード</h3>
+          <p>ログインするとアカウント情報を表示できます。</p>
+          <form
+            action={async () => {
+              "use server";
+              await signIn("google");
+            }}
+          >
+            <button className="change-button" type="submit">
+              Googleでログイン
+            </button>
+          </form>
+        </section>
       </main>
     );
   }
 
-  // DB から該当ユーザー行と関連を取得（Account/Session）
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: {
-      accounts: true,
-      sessions: true,
-    },
-  });
-
-  // “安全に表示できる形”へ変換（アクセストークン等はマスク）
-  const safeDump = dbUser && {
-    ...dbUser,
-    accounts: dbUser.accounts.map((a) => ({
-      id: a.id,
-      provider: a.provider,
-      providerAccountId: a.providerAccountId,
-      type: a.type,
-      scope: a.scope,
-      expires_at: a.expires_at,
-      token_type: a.token_type,
-      // 秘匿系はマスク
-      access_token: mask(a.access_token),
-      refresh_token: mask(a.refresh_token),
-      id_token: mask(a.id_token),
-      session_state: mask(a.session_state),
-    })),
-    sessions: dbUser.sessions.map((s) => ({
-      id: s.id,
-      userId: s.userId,
-      expires: s.expires,
-      // セッショントークンは念のためマスク
-      sessionToken: mask(s.sessionToken),
-    })),
-  };
+  const [accounts, sessions] = await Promise.all([
+    prisma.account.findMany({
+      where: { userId: currentUser.id },
+      orderBy: { id: "asc" },
+      select: {
+        id: true,
+        provider: true,
+        providerAccountId: true,
+        type: true,
+        scope: true,
+        expiresAt: true,
+      },
+    }),
+    prisma.session.findMany({
+      where: { userId: currentUser.id },
+      orderBy: { expires: "desc" },
+      select: {
+        id: true,
+        expires: true,
+      },
+    }),
+  ]);
 
   return (
-    <main className="mx-auto max-w-3xl p-6 space-y-8">
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-semibold">ユーザー情報（開発用ビュー）</h1>
+    <main className="main-content">
+      <div className="user-info">
+        <h3>ユーザー情報</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>ユーザーID</td>
+              <td>{currentUser.id}</td>
+            </tr>
+            <tr>
+              <td>ニックネーム</td>
+              <td>{currentUser.name ?? "(未設定)"}</td>
+            </tr>
+            <tr>
+              <td>メールアドレス</td>
+              <td>{currentUser.email ?? "(未設定)"}</td>
+            </tr>
+            <tr>
+              <td>地域</td>
+              <td>{currentUser.region ?? "(未設定)"}</td>
+            </tr>
+            <tr>
+              <td>接続プロバイダ数</td>
+              <td>{accounts.length}</td>
+            </tr>
+            <tr>
+              <td>有効セッション数</td>
+              <td>{sessions.length}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div className="settings">
+        <h3>接続情報（概要）</h3>
+        <table>
+          <tbody>
+            {accounts.length === 0 ? (
+              <tr>
+                <td>外部アカウント</td>
+                <td>未接続</td>
+              </tr>
+            ) : (
+              accounts.map((account) => (
+                <tr key={account.id}>
+                  <td>{account.provider}</td>
+                  <td>{account.providerAccountId}</td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+
         <form
           action={async () => {
             "use server";
             await signOut();
           }}
         >
-          <button className="rounded-lg border px-3 py-1.5">Sign out</button>
+          <button className="change-button" type="submit">
+            ログアウト
+          </button>
         </form>
-      </header>
-
-      {/* 基本プロフィール */}
-      <section className="flex items-center gap-4">
-        {session.user.image ? (
-          <Image
-            src={session.user.image}
-            alt={session.user.name ?? "User"}
-            width={56}
-            height={56}
-            className="rounded-full"
-          />
-        ) : (
-          <div className="h-14 w-14 rounded-full bg-gray-300 grid place-items-center">
-            {(session.user.name ?? "U").slice(0, 1).toUpperCase()}
-          </div>
-        )}
-        <div>
-          <div className="text-lg font-medium">{session.user.name ?? "(no name)"}</div>
-          <div className="text-sm text-gray-600">{session.user.email ?? "(no email)"}</div>
-          <div className="text-xs text-gray-500">User ID: {session.user.id}</div>
-        </div>
-      </section>
-
-      {/* セッション（NextAuthの見えている値） */}
-      <section>
-        <h2 className="font-semibold mb-2">Session（フロントへ渡る値）</h2>
-        <pre className="rounded-lg border p-3 overflow-x-auto text-sm">
-{JSON.stringify(session, null, 2)}
-        </pre>
-      </section>
-
-      {/* DB側（Prisma経由） */}
-      <section>
-        <h2 className="font-semibold mb-2">Database（User / Account / Session）</h2>
-        <pre className="rounded-lg border p-3 overflow-x-auto text-sm">
-{JSON.stringify(safeDump, null, 2)}
-        </pre>
-        <p className="mt-2 text-xs text-gray-500">
-          ※ アクセストークン等の秘匿値は表示用にマスクしています。
-        </p>
-      </section>
+      </div>
     </main>
   );
 }

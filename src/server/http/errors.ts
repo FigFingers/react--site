@@ -38,7 +38,6 @@ export class BadRequestError extends HttpError {
 
 export class UnauthorizedError extends HttpError {
   constructor(
-    // biome-ignore lint/security/noSecrets: There is no confidential data.
     message = "Authentication required",
     code = "UNAUTHORIZED",
     details?: unknown,
@@ -69,12 +68,21 @@ export class ConflictError extends HttpError {
   }
 }
 
-export function toErrorPayload(err: unknown): {
+type ToErrorPayloadOptions = {
+  exposeDetails?: boolean;
+};
+
+export function toErrorPayload(
+  err: unknown,
+  options?: ToErrorPayloadOptions,
+): {
   status: number;
   body: { message: string; code?: string; details?: JsonValue };
 } {
+  const exposeDetails = options?.exposeDetails ?? false;
+
   if (err instanceof HttpError) {
-    const details = sanitizeJson(err.details);
+    const details = exposeDetails ? sanitizeJson(err.details) : undefined;
     return {
       status: err.status,
       body: { message: err.message, code: err.code, details },
@@ -83,7 +91,9 @@ export function toErrorPayload(err: unknown): {
 
   const prismaMapped = mapPrismaError(err);
   if (prismaMapped) {
-    const details = sanitizeJson(prismaMapped.details);
+    const details = exposeDetails
+      ? sanitizeJson(prismaMapped.details)
+      : undefined;
     return {
       status: prismaMapped.status,
       body: {
@@ -94,8 +104,10 @@ export function toErrorPayload(err: unknown): {
     };
   }
 
-  const message = err instanceof Error ? err.message : "Unexpected error";
-  return { status: 500, body: { message, code: "INTERNAL_ERROR" } };
+  return {
+    status: 500,
+    body: { message: "Internal server error", code: "INTERNAL_ERROR" },
+  };
 }
 
 function mapPrismaError(err: unknown): HttpError | null {

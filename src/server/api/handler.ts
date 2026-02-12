@@ -79,6 +79,7 @@ export function createApiHandler<
   const allowHeader = METHODS.filter(
     (m) => typeof handlers[m] === "function",
   ).join(", ");
+  const isDevelopment = process.env.NODE_ENV !== "production";
 
   // ここが Next.js から直接呼ばれるハンドラ
   return async function handler(
@@ -122,8 +123,24 @@ export function createApiHandler<
     try {
       return await fn(req, context);
     } catch (error) {
-      const { status, body } = toErrorPayload(error);
-      return Response.json(body, { status });
+      const requestId = req.headers.get("x-request-id") ?? crypto.randomUUID();
+      const { status, body } = toErrorPayload(error, {
+        exposeDetails: isDevelopment,
+      });
+
+      console.error("API handler error", {
+        requestId,
+        method: req.method,
+        path: req.nextUrl.pathname,
+        status,
+        code: body.code,
+        error,
+      });
+
+      return Response.json(body, {
+        status,
+        headers: { "x-request-id": requestId },
+      });
     }
   };
 }

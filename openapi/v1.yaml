@@ -101,6 +101,11 @@ components:
         pageSize: { type: integer }
         total: { type: integer }
         totalPages: { type: integer }
+        hasPrev: { type: boolean }
+        hasNext: { type: boolean }
+        outOfRange:
+          type: boolean
+          description: True when requested page is greater than totalPages (and totalPages > 0).
     Paginated:
       type: object
       properties:

@@ -77,19 +77,31 @@ export async function listUserVods(
   return { data: records.map((record) => record.vod), total };
 }
 
-export function addUserVod(userId: number, vodId: number) {
-  return prisma.userVod.upsert({
-    where: { userId_vodId: { userId, vodId } },
-    update: {},
-    create: { userId, vodId },
-  });
-}
+type ActiveInsertResult = {
+  active_exists: boolean;
+  inserted: boolean;
+};
 
-export async function hasActiveVod(vodId: number) {
-  const count = await prisma.vod.count({
-    where: { id: vodId, deletedAt: null },
-  });
-  return count > 0;
+export async function addUserVodIfVodActive(userId: number, vodId: number) {
+  const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
+    WITH active AS (
+      SELECT v.id
+      FROM vods v
+      WHERE v.id = ${vodId} AND v.deleted_at IS NULL
+    ),
+    inserted AS (
+      INSERT INTO users_vods (user_id, vod_id)
+      SELECT ${userId}, ${vodId}
+      FROM active
+      ON CONFLICT (user_id, vod_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM active) AS active_exists,
+      EXISTS (SELECT 1 FROM inserted) AS inserted
+  `;
+
+  return rows[0] ?? { active_exists: false, inserted: false };
 }
 
 export async function removeUserVod(userId: number, vodId: number) {

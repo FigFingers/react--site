@@ -55,12 +55,31 @@ export function hardDelete(id: number) {
   return prisma.playlist.delete({ where: { id } });
 }
 
-export function addClip(playlistId: number, clipId: number) {
-  return prisma.clipPlaylist.upsert({
-    where: { clipId_playlistId: { clipId, playlistId } },
-    update: {},
-    create: { playlistId, clipId },
-  });
+type ActiveInsertResult = {
+  active_exists: boolean;
+  inserted: boolean;
+};
+
+export async function addClipIfActive(playlistId: number, clipId: number) {
+  const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
+    WITH active AS (
+      SELECT c.id
+      FROM clips c
+      WHERE c.id = ${clipId} AND c.deleted_at IS NULL
+    ),
+    inserted AS (
+      INSERT INTO clips_playlists (playlist_id, clip_id)
+      SELECT ${playlistId}, ${clipId}
+      FROM active
+      ON CONFLICT (clip_id, playlist_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM active) AS active_exists,
+      EXISTS (SELECT 1 FROM inserted) AS inserted
+  `;
+
+  return rows[0] ?? { active_exists: false, inserted: false };
 }
 
 export function removeClip(playlistId: number, clipId: number) {
@@ -93,8 +112,26 @@ export async function listClips(
   return { data, total };
 }
 
-export function addVod(playlistId: number, vodId: number) {
-  return prisma.playlistVod.create({ data: { playlistId, vodId } });
+export async function addVodIfActive(playlistId: number, vodId: number) {
+  const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
+    WITH active AS (
+      SELECT v.id
+      FROM vods v
+      WHERE v.id = ${vodId} AND v.deleted_at IS NULL
+    ),
+    inserted AS (
+      INSERT INTO playlists_vods (playlist_id, vod_id)
+      SELECT ${playlistId}, ${vodId}
+      FROM active
+      ON CONFLICT (playlist_id, vod_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM active) AS active_exists,
+      EXISTS (SELECT 1 FROM inserted) AS inserted
+  `;
+
+  return rows[0] ?? { active_exists: false, inserted: false };
 }
 
 export function removeVod(playlistId: number, vodId: number) {
@@ -125,18 +162,4 @@ export async function listVods(
   ]);
   const data = rels.map((r) => r.vod) as Vod[];
   return { data, total };
-}
-
-export async function hasActiveClip(clipId: number) {
-  const count = await prisma.clip.count({
-    where: { id: clipId, deletedAt: null },
-  });
-  return count > 0;
-}
-
-export async function hasActiveVod(vodId: number) {
-  const count = await prisma.vod.count({
-    where: { id: vodId, deletedAt: null },
-  });
-  return count > 0;
 }

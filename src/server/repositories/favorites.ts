@@ -23,8 +23,34 @@ export async function listFavoriteClips(
   return { data: rels.map((r) => r.clip), total };
 }
 
-export function addFavoriteClip(userId: number, clipId: number) {
-  return prisma.favoriteClip.create({ data: { userId, clipId } });
+type ActiveInsertResult = {
+  active_exists: boolean;
+  inserted: boolean;
+};
+
+export async function addFavoriteClipIfClipActive(
+  userId: number,
+  clipId: number,
+) {
+  const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
+    WITH active AS (
+      SELECT c.id
+      FROM clips c
+      WHERE c.id = ${clipId} AND c.deleted_at IS NULL
+    ),
+    inserted AS (
+      INSERT INTO favorite_clips (user_id, clip_id)
+      SELECT ${userId}, ${clipId}
+      FROM active
+      ON CONFLICT (user_id, clip_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM active) AS active_exists,
+      EXISTS (SELECT 1 FROM inserted) AS inserted
+  `;
+
+  return rows[0] ?? { active_exists: false, inserted: false };
 }
 
 export function removeFavoriteClip(userId: number, clipId: number) {
@@ -56,22 +82,29 @@ export async function listFavoritePlaylists(
   return { data: rels.map((r) => r.playlist), total };
 }
 
-export function addFavoritePlaylist(userId: number, playlistId: number) {
-  return prisma.favoritePlaylist.create({ data: { userId, playlistId } });
-}
+export async function addFavoritePlaylistIfActive(
+  userId: number,
+  playlistId: number,
+) {
+  const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
+    WITH active AS (
+      SELECT p.id
+      FROM playlists p
+      WHERE p.id = ${playlistId} AND p.deleted_at IS NULL
+    ),
+    inserted AS (
+      INSERT INTO favorite_playlists (user_id, playlist_id)
+      SELECT ${userId}, ${playlistId}
+      FROM active
+      ON CONFLICT (user_id, playlist_id) DO NOTHING
+      RETURNING 1
+    )
+    SELECT
+      EXISTS (SELECT 1 FROM active) AS active_exists,
+      EXISTS (SELECT 1 FROM inserted) AS inserted
+  `;
 
-export async function hasActiveClip(clipId: number) {
-  const count = await prisma.clip.count({
-    where: { id: clipId, deletedAt: null },
-  });
-  return count > 0;
-}
-
-export async function hasActivePlaylist(playlistId: number) {
-  const count = await prisma.playlist.count({
-    where: { id: playlistId, deletedAt: null },
-  });
-  return count > 0;
+  return rows[0] ?? { active_exists: false, inserted: false };
 }
 
 export function removeFavoritePlaylist(userId: number, playlistId: number) {

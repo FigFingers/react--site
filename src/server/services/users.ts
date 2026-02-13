@@ -38,9 +38,8 @@ export function listUserVods(
 
 export function addUserVod(currentUserId: number, id: number, vodId: number) {
   if (currentUserId !== id) throw new ForbiddenError();
-  return repo.hasActiveVod(vodId).then((exists) => {
-    if (!exists) throw new NotFoundError("VOD not found");
-    return repo.addUserVod(id, vodId);
+  return repo.addUserVodIfVodActive(id, vodId).then((result) => {
+    if (!result.active_exists) throw new NotFoundError("VOD not found");
   });
 }
 

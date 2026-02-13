@@ -1,4 +1,4 @@
-import { NotFoundError } from "@/server/http/errors";
+import { ConflictError, NotFoundError } from "@/server/http/errors";
 import * as repo from "@/server/repositories/favorites";
 
 export function listMyFavoriteClips(
@@ -8,11 +8,10 @@ export function listMyFavoriteClips(
   return repo.listFavoriteClips(userId, opts);
 }
 
-export function favoriteClip(userId: number, clipId: number) {
-  return repo.hasActiveClip(clipId).then((exists) => {
-    if (!exists) throw new NotFoundError("Clip not found");
-    return repo.addFavoriteClip(userId, clipId);
-  });
+export async function favoriteClip(userId: number, clipId: number) {
+  const result = await repo.addFavoriteClipIfClipActive(userId, clipId);
+  if (!result.active_exists) throw new NotFoundError("Clip not found");
+  if (!result.inserted) throw new ConflictError("Already favorited");
 }
 
 export function unfavoriteClip(userId: number, clipId: number) {
@@ -26,11 +25,10 @@ export function listMyFavoritePlaylists(
   return repo.listFavoritePlaylists(userId, opts);
 }
 
-export function favoritePlaylist(userId: number, playlistId: number) {
-  return repo.hasActivePlaylist(playlistId).then((exists) => {
-    if (!exists) throw new NotFoundError("Playlist not found");
-    return repo.addFavoritePlaylist(userId, playlistId);
-  });
+export async function favoritePlaylist(userId: number, playlistId: number) {
+  const result = await repo.addFavoritePlaylistIfActive(userId, playlistId);
+  if (!result.active_exists) throw new NotFoundError("Playlist not found");
+  if (!result.inserted) throw new ConflictError("Already favorited");
 }
 
 export function unfavoritePlaylist(userId: number, playlistId: number) {

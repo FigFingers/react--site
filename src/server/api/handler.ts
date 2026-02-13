@@ -104,14 +104,6 @@ export function createApiHandler<
 
     const method: HttpMethod = methodRaw; // ここから先は HttpMethod として扱える
 
-    // OPTIONS はデフォルトで返す（ただし上書きがあれば優先）
-    if (method === "OPTIONS" && typeof handlers.OPTIONS !== "function") {
-      return new Response(null, {
-        status: 204,
-        headers: allowHeader ? { Allow: allowHeader } : undefined,
-      });
-    }
-
     const fn = handlers[method];
     if (!fn) {
       return new Response(null, {

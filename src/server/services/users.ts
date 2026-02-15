@@ -1,4 +1,8 @@
-import { ForbiddenError, NotFoundError } from "@/server/http/errors";
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+} from "@/server/http/errors";
 import * as repo from "@/server/repositories/users";
 
 export function listUsers(opts: Parameters<typeof repo.list>[0]) {
@@ -40,6 +44,7 @@ export function addUserVod(currentUserId: number, id: number, vodId: number) {
   if (currentUserId !== id) throw new ForbiddenError();
   return repo.addUserVodIfVodActive(id, vodId).then((result) => {
     if (!result.active_exists) throw new NotFoundError("VOD not found");
+    if (!result.inserted) throw new ConflictError("VOD already added");
   });
 }
 
@@ -49,7 +54,5 @@ export function removeUserVod(
   vodId: number,
 ) {
   if (currentUserId !== id) throw new ForbiddenError();
-  return repo.removeUserVod(id, vodId).then((count) => {
-    if (count === 0) throw new NotFoundError("User VOD relation not found");
-  });
+  return repo.removeUserVod(id, vodId).then(() => undefined);
 }

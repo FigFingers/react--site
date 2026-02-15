@@ -351,6 +351,8 @@ paths:
               properties: { vodId: { $ref: "#/components/schemas/ID" } }
       responses:
         '201': { description: Added }
+        '404': { $ref: "#/components/responses/NotFound" }
+        '409': { $ref: "#/components/responses/Conflict" }
   /me/vods/{vodId}:
     delete:
       operationId: me.vods.remove
@@ -392,6 +394,8 @@ paths:
               properties: { clipId: { $ref: "#/components/schemas/ID" } }
       responses:
         '201': { description: Favorited }
+        '404': { $ref: "#/components/responses/NotFound" }
+        '409': { $ref: "#/components/responses/Conflict" }
   /me/favorites/clips/{clipId}:
     delete:
       operationId: me.favorites.clips.remove
@@ -433,6 +437,8 @@ paths:
               properties: { playlistId: { $ref: "#/components/schemas/ID" } }
       responses:
         '201': { description: Favorited }
+        '404': { $ref: "#/components/responses/NotFound" }
+        '409': { $ref: "#/components/responses/Conflict" }
   /me/favorites/playlists/{playlistId}:
     delete:
       operationId: me.favorites.playlists.remove

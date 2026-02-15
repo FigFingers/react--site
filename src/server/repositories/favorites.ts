@@ -54,8 +54,8 @@ export async function addFavoriteClipIfClipActive(
 }
 
 export function removeFavoriteClip(userId: number, clipId: number) {
-  return prisma.favoriteClip.delete({
-    where: { userId_clipId: { userId, clipId } },
+  return prisma.favoriteClip.deleteMany({
+    where: { userId, clipId },
   });
 }
 
@@ -108,7 +108,7 @@ export async function addFavoritePlaylistIfActive(
 }
 
 export function removeFavoritePlaylist(userId: number, playlistId: number) {
-  return prisma.favoritePlaylist.delete({
-    where: { userId_playlistId: { userId, playlistId } },
+  return prisma.favoritePlaylist.deleteMany({
+    where: { userId, playlistId },
   });
 }

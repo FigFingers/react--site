@@ -1,32 +1,54 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Clip from "@/app/base/clip/clipData";
+import ServiceTabs, { ALL_SERVICE, toServiceKey, toServicePanelId, toServiceTabId } from "@/app/base/clip/ServiceTabs";
 
 const DISPLAY_SIZE = 10;
 
-export default function ClipList({ clipApiUrl, userId }) {
-  const [cache, setCache] = useState([]);
+type ClipItem = {
+  id?: number;
+  clipName?: string;
+  title?: string;
+  epnumber?: string;
+  url?: string;
+  user?: string;
+  service?: string;
+  startTime?: number;
+  endTime?: number;
+};
+
+type ClipResponse = {
+  items?: ClipItem[];
+  nextCursor?: number | null;
+};
+
+type ClipListProps = {
+  clipApiUrl: string;
+  userId: string | null;
+};
+
+export default function ClipList({ clipApiUrl, userId }: ClipListProps) {
+  const [cache, setCache] = useState<ClipItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
+  const [selectedService, setSelectedService] = useState<string>(ALL_SERVICE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // StrictMode 対策：同じ clipApiUrl での二重フェッチを防ぐフラグ
   const didFetchRef = useRef<string | null>(null);
 
-  // =========================
-  // Chunk Fetch
-  // =========================
   const fetchChunk = async (cursorValue: number | null = null) => {
     try {
       setLoading(true);
 
       const hasQuery = clipApiUrl.includes("?");
 
-      const url = cursorValue !== null
-        ? `${clipApiUrl}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
-        : clipApiUrl;
+      const url =
+        cursorValue !== null
+          ? `${clipApiUrl}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
+          : clipApiUrl;
 
       console.log("[ClipList] FETCH URL:", url);
 
@@ -36,31 +58,27 @@ export default function ClipList({ clipApiUrl, userId }) {
       const text = await res.text();
       if (!text) throw new Error("レスポンスが空です");
 
-      const json = JSON.parse(text);
+      const json: ClipResponse = JSON.parse(text);
       if (!json.items) throw new Error("items がありません");
 
-      setCache((prev) => [...prev, ...json.items]);
+      setCache((prev) => [...prev, ...json.items!]);
       setCursor(json.nextCursor ?? null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("データ取得エラー:", err);
-      setError(err.message ?? String(err));
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  // =========================
-  // 初回ロード & クエリ変更時のリセット
-  // =========================
   useEffect(() => {
-    // clipApiUrl が変わったら state をリセット
     setCache([]);
     setCursor(null);
     setVisibleIndex(0);
     setError(null);
     setLoading(true);
 
-    // StrictMode 対策：同じ URL で2回呼ばない
     if (didFetchRef.current === clipApiUrl) {
       return;
     }
@@ -69,15 +87,37 @@ export default function ClipList({ clipApiUrl, userId }) {
     fetchChunk(null);
   }, [clipApiUrl]);
 
-  // =========================
-  // Navigation
-  // =========================
+  const services = useMemo(() => {
+    const unique = new Set<string>();
+
+    cache.forEach((item) => {
+      if (item.service) {
+        unique.add(toServiceKey(item.service));
+      }
+    });
+
+    return Array.from(unique).sort();
+  }, [cache]);
+
+  const filteredCache = useMemo(() => {
+    if (selectedService === ALL_SERVICE) {
+      return cache;
+    }
+
+    return cache.filter((item) => toServiceKey(item.service ?? "") === selectedService);
+  }, [cache, selectedService]);
+
+  const handleServiceChange = useCallback((service: string) => {
+    setSelectedService(service);
+    setVisibleIndex(0);
+  }, []);
+
   const nextPage = () => {
     const nextIdx = visibleIndex + DISPLAY_SIZE;
 
     const shouldFetch =
       cursor !== null &&
-      (nextIdx >= cache.length - DISPLAY_SIZE || cache.length - nextIdx < 30);
+      (nextIdx >= filteredCache.length - DISPLAY_SIZE || filteredCache.length - nextIdx < 30);
 
     if (shouldFetch) {
       fetchChunk(cursor);
@@ -93,12 +133,8 @@ export default function ClipList({ clipApiUrl, userId }) {
     }
   };
 
-  const visibleItems = cache.slice(
-    visibleIndex,
-    visibleIndex + DISPLAY_SIZE
-  );
+  const visibleItems = filteredCache.slice(visibleIndex, visibleIndex + DISPLAY_SIZE);
 
-  // カスタムイベント
   useEffect(() => {
     if (!loading && visibleItems.length > 0) {
       const event = new CustomEvent("clipListElementsRendered", {
@@ -113,7 +149,14 @@ export default function ClipList({ clipApiUrl, userId }) {
 
   return (
     <>
-      <section className="content-list">
+      <ServiceTabs services={services} onServiceChange={handleServiceChange} />
+
+      <section
+        id={toServicePanelId(selectedService)}
+        role="tabpanel"
+        aria-labelledby={toServiceTabId(selectedService)}
+        className="content-list"
+      >
         {visibleItems.length > 0 ? (
           visibleItems.map((item, index) => (
             <Clip
@@ -131,7 +174,7 @@ export default function ClipList({ clipApiUrl, userId }) {
             />
           ))
         ) : (
-          <p>データがありません。</p>
+          <p>このサービスのクリップはまだありません。</p>
         )}
       </section>
 
@@ -148,7 +191,7 @@ export default function ClipList({ clipApiUrl, userId }) {
         <button
           type="button"
           onClick={nextPage}
-          disabled={cursor === null && visibleIndex + DISPLAY_SIZE >= cache.length}
+          disabled={cursor === null && visibleIndex + DISPLAY_SIZE >= filteredCache.length}
           className="px-4 py-2 rounded bg-gray-600 text-white disabled:bg-gray-400"
         >
           次へ

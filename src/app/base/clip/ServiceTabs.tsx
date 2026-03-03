@@ -1,11 +1,17 @@
 "use client";
 
-import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+type ServiceTabItem = {
+  key: string;
+  label: string;
+};
+
 type ServiceTabsProps = {
-  services: string[];
-  onServiceChange: (service: string) => void;
+  services: ServiceTabItem[];
+  value: string;
+  onChange: (service: string) => void;
 };
 
 const ALL_SERVICE = "all";
@@ -16,28 +22,23 @@ const toServiceIdSuffix = (service: string) => toServiceKey(service).replace(/[^
 export const toServicePanelId = (service: string) => `service-panel-${toServiceIdSuffix(service)}`;
 export const toServiceTabId = (service: string) => `service-tab-${toServiceIdSuffix(service)}`;
 
-export default function ServiceTabs({ services, onServiceChange }: ServiceTabsProps) {
+export default function ServiceTabs({ services, value, onChange }: ServiceTabsProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const tabs = useMemo(() => [ALL_SERVICE, ...services], [services]);
+  const tabs = useMemo(() => [{ key: ALL_SERVICE, label: "All" }, ...services], [services]);
 
   const queryService = searchParams.get("service")?.toLowerCase();
-  const initialService = queryService && tabs.includes(queryService) ? queryService : ALL_SERVICE;
-
-  const [focusedIndex, setFocusedIndex] = useState(() => tabs.indexOf(initialService));
-  const [selectedService, setSelectedService] = useState(initialService);
-
-  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
 
   useEffect(() => {
-    const nextService = queryService && tabs.includes(queryService) ? queryService : ALL_SERVICE;
+    const hasQueryService = queryService && tabs.some((tab) => tab.key === queryService);
+    const nextService = hasQueryService ? queryService : ALL_SERVICE;
 
-    setSelectedService(nextService);
-    setFocusedIndex(tabs.indexOf(nextService));
-    onServiceChange(nextService);
-  }, [onServiceChange, queryService, tabs]);
+    if (value !== nextService) {
+      onChange(nextService);
+    }
+  }, [onChange, queryService, tabs, value]);
 
   const updateQuery = (service: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -53,59 +54,38 @@ export default function ServiceTabs({ services, onServiceChange }: ServiceTabsPr
     router.replace(nextUrl, { scroll: false });
   };
 
-  const selectByIndex = (index: number) => {
-    const service = tabs[index];
-    setSelectedService(service);
-    setFocusedIndex(index);
-    onServiceChange(service);
+  const handleClick = (service: string) => {
+    onChange(service);
     updateQuery(service);
   };
 
-  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
-    if (event.key === "ArrowRight" || event.key === "ArrowLeft") {
-      event.preventDefault();
-      const direction = event.key === "ArrowRight" ? 1 : -1;
-      const nextIndex = (index + direction + tabs.length) % tabs.length;
-      setFocusedIndex(nextIndex);
-      tabRefs.current[nextIndex]?.focus();
-      return;
-    }
-
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      selectByIndex(index);
-    }
-  };
-
   return (
-    <div role="tablist" aria-label="Service tabs" className="flex gap-2 mb-4">
-      {tabs.map((service, index) => {
-        const tabId = toServiceTabId(service);
-        const panelId = toServicePanelId(service);
-        const selected = selectedService === service;
+    <div className="mb-4 border-b border-gray-200">
+      <div role="tablist" aria-label="Service tabs" className="flex gap-1 overflow-x-auto">
+        {tabs.map((service) => {
+          const selected = value === service.key;
 
-        return (
-          <button
-            key={service}
-            id={tabId}
-            ref={(element) => {
-              tabRefs.current[index] = element;
-            }}
-            type="button"
-            role="tab"
-            aria-selected={selected}
-            aria-controls={panelId}
-            tabIndex={focusedIndex === index ? 0 : -1}
-            onClick={() => selectByIndex(index)}
-            onKeyDown={(event) => handleKeyDown(event, index)}
-            className={`px-3 py-1 rounded border ${
-              selected ? "bg-gray-700 text-white" : "bg-white text-gray-700"
-            }`}
-          >
-            {service === ALL_SERVICE ? "All" : service}
-          </button>
-        );
-      })}
+          return (
+            <button
+              key={service.key}
+              id={toServiceTabId(service.key)}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              className={[
+                "whitespace-nowrap px-4 py-2 text-sm border-b-2 -mb-px transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400 focus-visible:ring-offset-1",
+                selected
+                  ? "border-gray-900 text-gray-900 font-medium"
+                  : "border-transparent text-gray-600 hover:bg-gray-100 hover:text-gray-900",
+              ].join(" ")}
+              onClick={() => handleClick(service.key)}
+            >
+              {service.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

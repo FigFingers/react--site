@@ -96,7 +96,9 @@ export default function ClipList({ clipApiUrl, userId }: ClipListProps) {
       }
     });
 
-    return Array.from(unique).sort();
+    return Array.from(unique)
+      .sort()
+      .map((service) => ({ key: service, label: service }));
   }, [cache]);
 
   const filteredCache = useMemo(() => {
@@ -149,7 +151,7 @@ export default function ClipList({ clipApiUrl, userId }: ClipListProps) {
 
   return (
     <>
-      <ServiceTabs services={services} onServiceChange={handleServiceChange} />
+      <ServiceTabs services={services} value={selectedService} onChange={handleServiceChange} />
 
       <section
         id={toServicePanelId(selectedService)}

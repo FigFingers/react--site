@@ -156,7 +156,7 @@ components:
             - number
             - boolean
             - "null"
-    User:
+    AdminUser:
       type: object
       properties:
         id:
@@ -194,6 +194,41 @@ components:
           anyOf:
             - $ref: "#/components/schemas/DateTime"
             - type: "null"
+      additionalProperties: false
+    CurrentUser:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        name:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+        emailVerified:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+        image:
+          type:
+            - string
+            - "null"
+          maxLength: 2048
+          format: uri
+        region:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
       additionalProperties: false
     UserCreate:
       type: object
@@ -490,7 +525,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/CurrentUser"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -820,7 +855,7 @@ paths:
                   data:
                     type: array
                     items:
-                      $ref: "#/components/schemas/User"
+                      $ref: "#/components/schemas/AdminUser"
                   meta:
                     $ref: "#/components/schemas/CursorPaginationMeta"
                 required:
@@ -850,7 +885,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/AdminUser"
         "409":
           $ref: "#/components/responses/Conflict"
   "/users/{id}":
@@ -875,7 +910,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/AdminUser"
         "404":
           $ref: "#/components/responses/NotFound"
     patch:
@@ -899,7 +934,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/User"
+                $ref: "#/components/schemas/AdminUser"
         "400":
           $ref: "#/components/responses/BadRequest"
     delete:

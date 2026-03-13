@@ -1,4 +1,6 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { type CursorPayload, encodeCursor } from "@/server/http/pagination";
 
 export async function listFavoriteClips(
   userId: number,
@@ -21,6 +23,49 @@ export async function listFavoriteClips(
     }),
   ]);
   return { data: rels.map((r) => r.clip), total };
+}
+
+export async function listFavoriteClipsCursor(
+  userId: number,
+  opts: { cursor?: CursorPayload | null; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorClipId = opts.cursor
+    ? Number.parseInt(opts.cursor.i, 10)
+    : undefined;
+  const where: Prisma.FavoriteClipWhereInput = {
+    userId,
+    clip: { deletedAt: null },
+  };
+
+  if (cursorDate && cursorClipId != null && Number.isFinite(cursorClipId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      { AND: [{ createdAt: cursorDate }, { clipId: { lt: cursorClipId } }] },
+    ];
+  }
+
+  const rels = await prisma.favoriteClip.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { clipId: "desc" }],
+    include: { clip: true },
+  });
+
+  const hasNext = rels.length > limit;
+  const page = hasNext ? rels.slice(0, limit) : rels;
+  const last = page.at(-1);
+
+  return {
+    data: page.map(
+      (record) =>
+        (record as Prisma.FavoriteClipGetPayload<{ include: { clip: true } }>)
+          .clip,
+    ),
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.clipId) : null,
+  };
 }
 
 type ActiveInsertResult = {
@@ -80,6 +125,61 @@ export async function listFavoritePlaylists(
     }),
   ]);
   return { data: rels.map((r) => r.playlist), total };
+}
+
+export async function listFavoritePlaylistsCursor(
+  userId: number,
+  opts: { cursor?: CursorPayload | null; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorPlaylistId = opts.cursor
+    ? Number.parseInt(opts.cursor.i, 10)
+    : undefined;
+  const where: Prisma.FavoritePlaylistWhereInput = {
+    userId,
+    playlist: { deletedAt: null },
+  };
+
+  if (
+    cursorDate &&
+    cursorPlaylistId != null &&
+    Number.isFinite(cursorPlaylistId)
+  ) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        AND: [
+          { createdAt: cursorDate },
+          { playlistId: { lt: cursorPlaylistId } },
+        ],
+      },
+    ];
+  }
+
+  const rels = await prisma.favoritePlaylist.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { playlistId: "desc" }],
+    include: { playlist: true },
+  });
+
+  const hasNext = rels.length > limit;
+  const page = hasNext ? rels.slice(0, limit) : rels;
+  const last = page.at(-1);
+
+  return {
+    data: page.map(
+      (record) =>
+        (
+          record as Prisma.FavoritePlaylistGetPayload<{
+            include: { playlist: true };
+          }>
+        ).playlist,
+    ),
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.playlistId) : null,
+  };
 }
 
 export async function addFavoritePlaylistIfActive(

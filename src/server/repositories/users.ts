@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { type CursorPayload, encodeCursor } from "@/server/http/pagination";
 
 export function findById(id: number) {
   return prisma.user.findUnique({ where: { id } });
@@ -75,6 +76,42 @@ export async function listUserVods(
     }),
   ]);
   return { data: records.map((record) => record.vod), total };
+}
+
+export async function listUserVodsCursor(
+  userId: number,
+  opts: { cursor?: CursorPayload | null; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorVodId = opts.cursor
+    ? Number.parseInt(opts.cursor.i, 10)
+    : undefined;
+  const where: Prisma.UserVodWhereInput = { userId, vod: { deletedAt: null } };
+
+  if (cursorDate && cursorVodId != null && Number.isFinite(cursorVodId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      { AND: [{ createdAt: cursorDate }, { vodId: { lt: cursorVodId } }] },
+    ];
+  }
+
+  const records = await prisma.userVod.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { vodId: "desc" }],
+    include: { vod: true },
+  });
+
+  const hasNext = records.length > limit;
+  const page = hasNext ? records.slice(0, limit) : records;
+  const last = page.at(-1);
+
+  return {
+    data: page.map((record) => record.vod),
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.vodId) : null,
+  };
 }
 
 type ActiveInsertResult = {

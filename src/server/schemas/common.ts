@@ -7,6 +7,13 @@ export const paginationQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(100).optional().default(20),
 });
 
+export const cursorPaginationQuerySchema = z
+  .object({
+    cursor: z.string().min(1).optional(),
+    limit: z.coerce.number().int().min(1).max(100).optional().default(20),
+  })
+  .strict();
+
 export const includeDeletedQuerySchema = z.object({
   includeDeleted: z.coerce.boolean().optional().default(false),
 });
@@ -57,5 +64,6 @@ export function nonEmptyBody<T extends z.ZodRawShape>(schema: z.ZodObject<T>) {
 }
 
 export type PaginationQuery = z.infer<typeof paginationQuerySchema>;
+export type CursorPaginationQuery = z.infer<typeof cursorPaginationQuerySchema>;
 export type SortQuery = z.infer<typeof sortQuerySchema>;
 export type HardDeleteQuery = z.infer<typeof hardDeleteQuerySchema>;

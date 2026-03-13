@@ -1,8 +1,8 @@
 import { z } from "zod";
 
-import { idSchema, paginationQuerySchema } from "@/server/schemas/common";
+import { cursorPaginationQuerySchema, idSchema } from "@/server/schemas/common";
 
-export const favoriteListQuerySchema = paginationQuerySchema;
+export const favoriteListQuerySchema = cursorPaginationQuerySchema;
 
 export const favoriteClipBodySchema = z.object({ clipId: idSchema });
 export const favoritePlaylistBodySchema = z.object({ playlistId: idSchema });

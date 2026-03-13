@@ -1,6 +1,8 @@
-const DEFAULT_PAGE = 1;
+import { BadRequestError } from "@/server/http/errors";
+
 const DEFAULT_PAGE_SIZE = 20;
 const DEFAULT_MAX_PAGE_SIZE = 100;
+const CURSOR_VERSION = 1;
 
 export interface PaginationInit {
   page?: number | string | null;
@@ -27,8 +29,32 @@ export interface PaginationMeta {
   outOfRange: boolean;
 }
 
+export interface CursorPaginationInit {
+  cursor?: string | null;
+  limit?: number | string | null;
+  defaultLimit?: number;
+  maxLimit?: number;
+}
+
+export interface CursorPaginationParams {
+  cursor: CursorPayload | null;
+  limit: number;
+}
+
+export interface CursorPaginationMeta {
+  limit: number;
+  hasNext: boolean;
+  nextCursor: string | null;
+}
+
+export interface CursorPayload {
+  c: string;
+  i: string;
+  v: number;
+}
+
 export function parsePagination(init: PaginationInit = {}): PaginationParams {
-  const defaultPage = clampInt(toNumber(init.defaultPage, DEFAULT_PAGE), 1);
+  const defaultPage = clampInt(toNumber(init.defaultPage, 1), 1);
   const defaultPageSize = clampInt(
     toNumber(init.defaultPageSize, DEFAULT_PAGE_SIZE),
     1,
@@ -48,6 +74,78 @@ export function parsePagination(init: PaginationInit = {}): PaginationParams {
     skip: (page - 1) * pageSize,
     take: pageSize,
   };
+}
+
+export function parseCursorPagination(
+  init: CursorPaginationInit = {},
+): CursorPaginationParams {
+  const defaultLimit = clampInt(
+    toNumber(init.defaultLimit, DEFAULT_PAGE_SIZE),
+    1,
+  );
+  const maxLimit = clampInt(toNumber(init.maxLimit, DEFAULT_MAX_PAGE_SIZE), 1);
+  const rawLimit = clampInt(toNumber(init.limit, defaultLimit), 1);
+
+  return {
+    cursor: decodeCursor(init.cursor),
+    limit: Math.min(rawLimit, maxLimit),
+  };
+}
+
+export function buildCursorPaginationMeta(
+  params: CursorPaginationParams,
+  hasNext: boolean,
+  nextCursor: string | null,
+): CursorPaginationMeta {
+  return {
+    limit: params.limit,
+    hasNext,
+    nextCursor: hasNext ? nextCursor : null,
+  };
+}
+
+export function encodeCursor(
+  createdAt: Date,
+  id: number | bigint | string,
+): string {
+  const payload: CursorPayload = {
+    c: createdAt.toISOString(),
+    i: String(id),
+    v: CURSOR_VERSION,
+  };
+
+  return Buffer.from(JSON.stringify(payload), "utf8").toString("base64url");
+}
+
+export function decodeCursor(value?: string | null): CursorPayload | null {
+  if (value == null || value === "") return null;
+
+  try {
+    const decoded = JSON.parse(
+      Buffer.from(value, "base64url").toString("utf8"),
+    ) as Partial<CursorPayload>;
+
+    if (
+      decoded.v !== CURSOR_VERSION ||
+      typeof decoded.c !== "string" ||
+      typeof decoded.i !== "string"
+    ) {
+      throw new Error("Invalid cursor payload");
+    }
+
+    const createdAt = new Date(decoded.c);
+    if (Number.isNaN(createdAt.getTime())) {
+      throw new Error("Invalid cursor timestamp");
+    }
+
+    return {
+      c: createdAt.toISOString(),
+      i: decoded.i,
+      v: decoded.v,
+    };
+  } catch {
+    throw new BadRequestError("Invalid cursor", "INVALID_CURSOR");
+  }
 }
 
 export function buildPaginationMeta(

@@ -1,5 +1,6 @@
 import type { Clip, Prisma, Vod } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { type CursorPayload, encodeCursor } from "@/server/http/pagination";
 
 export function findById(id: number) {
   return prisma.playlist.findUnique({ where: { id } });
@@ -34,6 +35,51 @@ export async function list(
     }),
   ]);
   return { data, total };
+}
+
+export async function listCursor(
+  opts: {
+    cursor?: CursorPayload | null;
+    limit?: number;
+    includeDeleted?: boolean;
+    userId?: number;
+    name?: string;
+  } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorId = opts.cursor ? Number.parseInt(opts.cursor.i, 10) : undefined;
+  const where: Prisma.PlaylistWhereInput = {};
+
+  if (!opts.includeDeleted) where.deletedAt = null;
+  if (opts.userId != null) where.userId = opts.userId;
+  if (opts.name && opts.name.trim() !== "") {
+    where.name = { contains: opts.name.trim(), mode: "insensitive" };
+  }
+  if (cursorDate && cursorId != null && Number.isFinite(cursorId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        AND: [{ createdAt: cursorDate }, { id: { lt: cursorId } }],
+      },
+    ];
+  }
+
+  const data = await prisma.playlist.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+
+  const hasNext = data.length > limit;
+  const page = hasNext ? data.slice(0, limit) : data;
+  const last = page.at(-1);
+
+  return {
+    data: page,
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.id) : null,
+  };
 }
 
 export function create(data: { userId: number; name: string }) {

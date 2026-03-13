@@ -8,6 +8,13 @@ export function listMyFavoriteClips(
   return repo.listFavoriteClips(userId, opts);
 }
 
+export function listMyFavoriteClipsCursor(
+  userId: number,
+  opts?: Parameters<typeof repo.listFavoriteClipsCursor>[1],
+) {
+  return repo.listFavoriteClipsCursor(userId, opts);
+}
+
 export async function favoriteClip(userId: number, clipId: number) {
   const result = await repo.addFavoriteClipIfClipActive(userId, clipId);
   if (!result.active_exists) throw new NotFoundError("Clip not found");
@@ -23,6 +30,13 @@ export function listMyFavoritePlaylists(
   opts?: Parameters<typeof repo.listFavoritePlaylists>[1],
 ) {
   return repo.listFavoritePlaylists(userId, opts);
+}
+
+export function listMyFavoritePlaylistsCursor(
+  userId: number,
+  opts?: Parameters<typeof repo.listFavoritePlaylistsCursor>[1],
+) {
+  return repo.listFavoritePlaylistsCursor(userId, opts);
 }
 
 export async function favoritePlaylist(userId: number, playlistId: number) {

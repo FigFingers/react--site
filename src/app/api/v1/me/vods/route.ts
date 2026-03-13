@@ -1,24 +1,27 @@
 import { createRouteHandlers } from "@/server/api/handler";
 import { requireUserId } from "@/server/auth/session";
-import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
+import {
+  buildCursorPaginationMeta,
+  parseCursorPagination,
+} from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
-import { paginationQuerySchema } from "@/server/schemas/common";
+import { cursorPaginationQuerySchema } from "@/server/schemas/common";
 import { userVodBodySchema } from "@/server/schemas/users.schema";
-import { addUserVod, listUserVods } from "@/server/services/users";
+import { addUserVod, listUserVodsCursor } from "@/server/services/users";
 
 export const { GET, POST } = createRouteHandlers({
   GET: async (req) => {
     const userId = await requireUserId();
     const query = parseSearchParams(
       req.nextUrl.searchParams,
-      paginationQuerySchema,
+      cursorPaginationQuerySchema,
     );
-    const pagination = parsePagination(query);
-    const { data, total } = await listUserVods(userId, {
-      skip: pagination.skip,
-      take: pagination.take,
+    const pagination = parseCursorPagination(query);
+    const { data, hasNext, nextCursor } = await listUserVodsCursor(userId, {
+      cursor: pagination.cursor,
+      limit: pagination.limit,
     });
-    const meta = buildPaginationMeta(pagination, total);
+    const meta = buildCursorPaginationMeta(pagination, hasNext, nextCursor);
     return Response.json({ data, meta });
   },
   POST: async (req) => {

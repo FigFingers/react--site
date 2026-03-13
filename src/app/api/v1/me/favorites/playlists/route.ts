@@ -1,6 +1,9 @@
 import { createRouteHandlers } from "@/server/api/handler";
 import { requireUserId } from "@/server/auth/session";
-import { buildPaginationMeta, parsePagination } from "@/server/http/pagination";
+import {
+  buildCursorPaginationMeta,
+  parseCursorPagination,
+} from "@/server/http/pagination";
 import { parseJsonBody, parseSearchParams } from "@/server/http/validation";
 import {
   favoriteListQuerySchema,
@@ -8,7 +11,7 @@ import {
 } from "@/server/schemas/favorites.schema";
 import {
   favoritePlaylist,
-  listMyFavoritePlaylists,
+  listMyFavoritePlaylistsCursor,
 } from "@/server/services/favorites";
 
 export const { GET, POST } = createRouteHandlers({
@@ -18,12 +21,15 @@ export const { GET, POST } = createRouteHandlers({
       req.nextUrl.searchParams,
       favoriteListQuerySchema,
     );
-    const pagination = parsePagination(query);
-    const { data, total } = await listMyFavoritePlaylists(userId, {
-      skip: pagination.skip,
-      take: pagination.take,
-    });
-    const meta = buildPaginationMeta(pagination, total);
+    const pagination = parseCursorPagination(query);
+    const { data, hasNext, nextCursor } = await listMyFavoritePlaylistsCursor(
+      userId,
+      {
+        cursor: pagination.cursor,
+        limit: pagination.limit,
+      },
+    );
+    const meta = buildCursorPaginationMeta(pagination, hasNext, nextCursor);
     return Response.json({ data, meta });
   },
   POST: async (req) => {

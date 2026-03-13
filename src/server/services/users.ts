@@ -40,6 +40,13 @@ export function listUserVods(
   return repo.listUserVods(userId, opts);
 }
 
+export function listUserVodsCursor(
+  userId: number,
+  opts?: Parameters<typeof repo.listUserVodsCursor>[1],
+) {
+  return repo.listUserVodsCursor(userId, opts);
+}
+
 export function addUserVod(currentUserId: number, id: number, vodId: number) {
   if (currentUserId !== id) throw new ForbiddenError();
   return repo.addUserVodIfVodActive(id, vodId).then((result) => {

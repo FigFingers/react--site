@@ -9,6 +9,12 @@ export function listPlaylists(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
 }
 
+export function listPlaylistsCursor(
+  opts?: Parameters<typeof repo.listCursor>[0],
+) {
+  return repo.listCursor(opts);
+}
+
 export async function getPlaylist(id: number) {
   const playlist = await repo.findById(id);
   if (!playlist) throw new NotFoundError("Playlist not found");

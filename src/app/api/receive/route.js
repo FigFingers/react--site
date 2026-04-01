@@ -1,61 +1,89 @@
-import { prisma } from '@/lib/prisma';
+import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
+import { buildClipWriteCorsHeaders, isAllowedClipWriteOrigin } from "@/lib/api/cors";
+import { normalizeClipBatchPayload } from "@/lib/clips/contract";
 
-/**
- * POST /api/receive
- * 動画クリップ情報の保存
- */
-export async function POST(req) {
-  try {
-    const data = await req.json();
-
-    const result = await prisma.clip.create({
-      data: {
-        clipName:  data.clipName, 
-        user:      data.user,
-        service:   data.service,
-        startTime: data.StartTime,
-        endTime:   data.EndTime,
-        url:       data.URL,
-        title:     data.title,
-        epnumber:  data.epnumber,
-      },
-    });
-
-    return new Response(JSON.stringify({ message: '保存完了', result }), {
-      status: 200,
-      headers: corsHeaders(),
-    });
-  } catch (error) {
-    console.error('POST /api/receive エラー:', error);
-    return new Response(JSON.stringify({ message: '保存失敗', error: error.message }), {
-      status: 500,
-      headers: corsHeaders(),
-    });
-  }
+function clipOwnerFromSession(session){
+if(session.user.name){
+const trimmed=session.user.name.trim();
+if(trimmed){
+return trimmed;
+}
+}
+if(session.user.email){
+return session.user.email;
+}
+return session.user.id;
 }
 
-/**
- * OPTIONS /api/receive
- * プリフライトリクエストへの対応
- */
-export function OPTIONS() {
-  return new Response(null, {
-    status: 200,
-    headers: corsHeaders({
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    }),
-  });
+async function createClipRecords(normalizedClips,owner){
+return prisma.$transaction(normalizedClips.map(function(clip){
+const data={
+clipName:clip.clipName?clip.clipName:undefined,
+user:owner,
+service:clip.service,
+startTime:clip.startTime,
+endTime:clip.endTime,
+url:clip.url,
+title:clip.title,
+};
+if(clip.epnumber){
+data.epnumber=clip.epnumber;
+}
+return prisma.clip.create({ data });
+}));
 }
 
-/**
- * CORSヘッダー共通設定
- */
-function corsHeaders(extra = {}) {
-  return {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    // 'Access-Control-Allow-Credentials': 'true', // 必要なら
-    ...extra,
-  };
+async function handleClipWrite(req){
+const headers=buildClipWriteCorsHeaders(req);
+if(!isAllowedClipWriteOrigin(req)){
+return new Response(JSON.stringify({ message: "Origin not allowed" }),{ status: 403, headers });
+}
+
+const session=await auth();
+if(!session){
+return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
+}
+if(!session.user){
+return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
+}
+if(!session.user.id){
+return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
+}
+
+let body;
+try{
+body=await req.json();
+}catch(error){
+return new Response(JSON.stringify({ message: "Invalid JSON", error: String(error) }),{ status: 400, headers });
+}
+
+const normalized=normalizeClipBatchPayload(body);
+if(!normalized.ok){
+return new Response(JSON.stringify({ message: "Validation failed", issues: normalized.issues }),{ status: 400, headers });
+}
+if(normalized.clips.length===0){
+return new Response(JSON.stringify({ message: "保存完了", savedCount: 0, items: [], result: null }),{ status: 200, headers });
+}
+
+try{
+const owner=clipOwnerFromSession(session);
+const items=await createClipRecords(normalized.clips,owner);
+return new Response(JSON.stringify({ message: "保存完了", savedCount: items.length, items, result: items[0]?items[0]:null }),{ status: 200, headers });
+}catch(error){
+console.error("POST /api/receive error:",error);
+return new Response(JSON.stringify({ message: "保存失敗", error: String(error) }),{ status: 500, headers });
+}
+}
+
+export async function POST(req){
+return handleClipWrite(req);
+}
+
+export function OPTIONS(req){
+const headers=buildClipWriteCorsHeaders(req);
+if(!isAllowedClipWriteOrigin(req)){
+return new Response(null,{ status: 403, headers });
+}
+return new Response(null,{ status: 200, headers });
 }

@@ -94,7 +94,7 @@ function normalizeSingleClip(
   rawClip: unknown,
   index: number,
   issues: ClipPayloadIssue[]
-) {
+): CanonicalClipInput | null {
   if (!isRecord(rawClip)) {
     issues.push({
       index,

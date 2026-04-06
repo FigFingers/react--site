@@ -1,38 +1,7 @@
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { buildClipWriteCorsHeaders, isAllowedClipWriteOrigin } from "@/lib/api/cors";
 import { normalizeClipBatchPayload } from "@/lib/clips/contract";
-
-function clipOwnerFromSession(session){
-if(session.user.name){
-const trimmed=session.user.name.trim();
-if(trimmed){
-return trimmed;
-}
-}
-if(session.user.email){
-return session.user.email;
-}
-return session.user.id;
-}
-
-async function createClipRecords(normalizedClips,owner){
-return prisma.$transaction(normalizedClips.map(function(clip){
-const data={
-clipName:clip.clipName?clip.clipName:undefined,
-user:owner,
-service:clip.service,
-startTime:clip.startTime,
-endTime:clip.endTime,
-url:clip.url,
-title:clip.title,
-};
-if(clip.epnumber){
-data.epnumber=clip.epnumber;
-}
-return prisma.clip.create({ data });
-}));
-}
+import { resolveClipOwnerName, writeClipBatch } from "@/lib/clips/service";
 
 async function handleClipWrite(req){
 const headers=buildClipWriteCorsHeaders(req);
@@ -67,8 +36,11 @@ return new Response(JSON.stringify({ message: "保存完了", savedCount: 0, ite
 }
 
 try{
-const owner=clipOwnerFromSession(session);
-const items=await createClipRecords(normalized.clips,owner);
+const owner={
+userId:session.user.id,
+ownerName:resolveClipOwnerName(session.user),
+};
+const items=await writeClipBatch(normalized.clips,owner);
 return new Response(JSON.stringify({ message: "保存完了", savedCount: items.length, items, result: items[0]?items[0]:null }),{ status: 200, headers });
 }catch(error){
 console.error("POST /api/receive error:",error);

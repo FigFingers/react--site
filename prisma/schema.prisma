@@ -17,6 +17,7 @@ model Clip {
   id            Int            @id @default(autoincrement()) // 自動採番の主キー
   clipName      String? //クリップ名
   user          String // ユーザー名
+  userId        String?
   service       String // Netflix, Primeなど
   startTime     Float // 開始時刻
   endTime       Float // 終了時刻
@@ -25,6 +26,9 @@ model Clip {
   epnumber      String         @default("エピソード不明") // エピソード名や番号
   createdAt     DateTime       @default(now()) // 登録日時
   playlistClips PlaylistClip[]
+  owner         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
 }
 
 model Playlist {
@@ -66,7 +70,48 @@ model User {
   accounts      Account[]
   sessions      Session[]
 
-  playlists Playlist[]
+  clips               Clip[]
+  playlists           Playlist[]
+  linkedExtensions    LinkedExtension[]
+  extensionLinkTokens ExtensionLinkToken[]
+}
+
+model LinkedExtension {
+  id                  Int          @id @default(autoincrement())
+  userId              String
+  extensionInstanceId String       @unique
+  extensionAuthHash   String
+  linkedAt            DateTime     @default(now())
+  lastSeenAt          DateTime     @default(now())
+  revokedAt           DateTime?
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncReceipts        SyncReceipt[]
+
+  @@index([userId, revokedAt])
+}
+
+model ExtensionLinkToken {
+  id        Int       @id @default(autoincrement())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+}
+
+model SyncReceipt {
+  id                Int             @id @default(autoincrement())
+  linkedExtensionId Int
+  clientItemId      String
+  itemType          String
+  createdAt         DateTime        @default(now())
+  linkedExtension   LinkedExtension @relation(fields: [linkedExtensionId], references: [id], onDelete: Cascade)
+
+  @@unique([linkedExtensionId, clientItemId])
+  @@index([linkedExtensionId, createdAt])
 }
 
 model Account {

@@ -19,6 +19,8 @@ const sessionCookieName = isProd
   ? "__Secure-authjs.session-token"
   : "authjs.session-token";
 
+const sessionCookieSameSite = isProd ? "none" : "lax";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
 
@@ -32,7 +34,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: sessionCookieName,
       options: {
         httpOnly: true,
-        sameSite: "none",
+        sameSite: sessionCookieSameSite,
         path: "/",
         secure: isProd,
       },

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "db:normalize-clip-users": "node scripts/normalize-legacy-clip-users.cjs --write"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

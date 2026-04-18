@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,17 +8,18 @@ datasource db {
 }
 
 model Clip {
-  id            Int            @id @default(autoincrement()) // 自動採番の主キー
-  clipName      String? //クリップ名
-  user          String // ユーザー名
+  id            Int            @id @default(autoincrement())
+  clipName      String?
+  user          String
+  userInfo      Json?
   userId        String?
-  service       String // Netflix, Primeなど
-  startTime     Float // 開始時刻
-  endTime       Float // 終了時刻
-  url           String // 動画URLやパス
-  title         String // 動画タイトル
-  epnumber      String         @default("エピソード不明") // エピソード名や番号
-  createdAt     DateTime       @default(now()) // 登録日時
+  service       String
+  startTime     Float
+  endTime       Float
+  url           String
+  title         String
+  epnumber      String         @default("エピソード不明")
+  createdAt     DateTime       @default(now())
   playlistClips PlaylistClip[]
   owner         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -45,7 +40,7 @@ model PlaylistClip {
   id         Int      @id @default(autoincrement())
   playlistId Int
   clipId     Int
-  order      Int       // 並び順
+  order      Int
 
   playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
   clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
@@ -53,20 +48,17 @@ model PlaylistClip {
   @@index([playlistId, order])
 }
 
-
 model User {
-  id    String  @id @default(cuid())
-  email String  @unique
-  name  String?
-  image String?
-
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  image         String?
   nickname      String?
-  nicknameNorm  String?   @unique
-  // 認証用
-  passwordHash  String? // Credentials用（Googleのみ運用なら不要）
+  nicknameNorm  String?  @unique
+  passwordHash  String?
   emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
   accounts      Account[]
   sessions      Session[]
 
@@ -91,13 +83,13 @@ model LinkedExtension {
 }
 
 model ExtensionLinkToken {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   userId    String
-  tokenHash String    @unique
+  tokenHash String   @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }

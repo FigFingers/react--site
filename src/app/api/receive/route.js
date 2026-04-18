@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { buildClipWriteCorsHeaders, isAllowedClipWriteOrigin } from "@/lib/api/cors";
 import { normalizeClipBatchPayload } from "@/lib/clips/contract";
-import { resolveClipOwnerName, writeClipBatch } from "@/lib/clips/service";
+import { resolveClipWriteOwnerFromSessionUser, writeClipBatch } from "@/lib/clips/service";
 
 async function handleClipWrite(req){
 const headers=buildClipWriteCorsHeaders(req);
@@ -36,10 +36,7 @@ return new Response(JSON.stringify({ message: "保存完了", savedCount: 0, ite
 }
 
 try{
-const owner={
-userId:session.user.id,
-ownerName:resolveClipOwnerName(session.user),
-};
+const owner=await resolveClipWriteOwnerFromSessionUser(session.user);
 const items=await writeClipBatch(normalized.clips,owner);
 return new Response(JSON.stringify({ message: "保存完了", savedCount: items.length, items, result: items[0]?items[0]:null }),{ status: 200, headers });
 }catch(error){

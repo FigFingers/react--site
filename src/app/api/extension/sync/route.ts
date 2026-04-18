@@ -2,7 +2,7 @@
 import{Prisma}from"@prisma/client";
 import{prisma}from"@/lib/prisma";
 import{buildExtensionCorsHeaders,isAllowedClipWriteOrigin}from"@/lib/api/cors";
-import{createClipRecord,resolveClipOwnerName}from"@/lib/clips/service";
+import{createClipRecord,resolveClipWriteOwnerFromLinkedExtension}from"@/lib/clips/service";
 import{authenticateLinkedExtension,normalizeExtensionSyncPayload,parseBearerToken}from"@/lib/extension/service";
 
 function buildHeaders(req){
@@ -48,7 +48,7 @@ const authResult=await authenticateLinkedExtension({extensionInstanceId:normaliz
 if(!authResult.ok){
 return json(req,{message:authResult.message},authResult.status);
 }
-const owner={userId:authResult.linkedExtension.userId,ownerName:resolveClipOwnerName(authResult.linkedExtension.user)};
+const owner=resolveClipWriteOwnerFromLinkedExtension(authResult.linkedExtension);
 const dedupedItems=dedupeItems(normalized.items);
 const acceptedItemIds=[];
 const now=new Date();

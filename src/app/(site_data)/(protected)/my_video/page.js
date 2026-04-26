@@ -10,8 +10,7 @@ export default async function app() {
 
   return (
     <>
-<ClipList clipApiUrl="api/search?user=yabuki"  userId={userId} />
-
+    <ClipList clipApiUrl="api/search"  userId={userId} />
     </>
   );
 }

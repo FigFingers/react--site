@@ -1,8 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/server/db";
+import { type CursorPayload, encodeCursor } from "@/server/http/pagination";
 
 export function findById(id: number) {
-  return prisma.clip.findUnique({ where: { id } });
+  return prisma.clip.findFirst({ where: { id, deletedAt: null } });
 }
 
 export async function list(
@@ -36,6 +37,53 @@ export async function list(
     }),
   ]);
   return { data, total };
+}
+
+export async function listCursor(
+  opts: {
+    cursor?: CursorPayload | null;
+    limit?: number;
+    includeDeleted?: boolean;
+    userId?: number;
+    vodId?: number;
+    title?: string;
+  } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorId = opts.cursor ? Number.parseInt(opts.cursor.i, 10) : undefined;
+  const where: Prisma.ClipWhereInput = {};
+
+  if (!opts.includeDeleted) where.deletedAt = null;
+  if (opts.userId != null) where.userId = opts.userId;
+  if (opts.vodId != null) where.vodId = opts.vodId;
+  if (opts.title && opts.title.trim() !== "") {
+    where.title = { contains: opts.title.trim(), mode: "insensitive" };
+  }
+  if (cursorDate && cursorId != null && Number.isFinite(cursorId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        AND: [{ createdAt: cursorDate }, { id: { lt: cursorId } }],
+      },
+    ];
+  }
+
+  const data = await prisma.clip.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+
+  const hasNext = data.length > limit;
+  const page = hasNext ? data.slice(0, limit) : data;
+  const last = page.at(-1);
+
+  return {
+    data: page,
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.id) : null,
+  };
 }
 
 export function create(data: {
@@ -74,8 +122,8 @@ export function hardDelete(id: number) {
 }
 
 export function incrementViews(id: number, by: bigint = 1n) {
-  return prisma.clip.update({
-    where: { id },
+  return prisma.clip.updateMany({
+    where: { id, deletedAt: null },
     data: { views: { increment: by } },
   });
 }

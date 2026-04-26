@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  cursorPaginationQuerySchema,
   hardDeleteQuerySchema,
   idSchema,
   includeDeletedQuerySchema,
@@ -18,6 +19,14 @@ export const clipListQuerySchema = paginationQuerySchema
     title: z.string().optional(),
   });
 
+export const clipCursorListQuerySchema = cursorPaginationQuerySchema
+  .extend({
+    userId: idSchema.optional(),
+    vodId: idSchema.optional(),
+    title: z.string().optional(),
+  })
+  .strict();
+
 export const clipCreateBodySchema = z
   .object({
     vodId: idSchema,
@@ -28,7 +37,11 @@ export const clipCreateBodySchema = z
     url: z.url(),
     epnum: z.string().nullable().optional(),
   })
-  .strict();
+  .strict()
+  .refine((data) => data.endMs > data.startMs, {
+    message: "endMs must be greater than startMs",
+    path: ["endMs"],
+  });
 
 export const clipUpdateBodySchema = nonEmptyBody(
   z
@@ -48,6 +61,7 @@ export const clipIdParamSchema = z.object({ clipId: idSchema });
 export const clipDeleteQuerySchema = hardDeleteQuerySchema;
 
 export type ClipListQuery = z.infer<typeof clipListQuerySchema>;
+export type ClipCursorListQuery = z.infer<typeof clipCursorListQuerySchema>;
 export type ClipCreateBody = z.infer<typeof clipCreateBodySchema>;
 export type ClipUpdateBody = z.infer<typeof clipUpdateBodySchema>;
 export type ClipIdParam = z.infer<typeof clipIdParamSchema>;

@@ -5,6 +5,10 @@ export function listClips(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
 }
 
+export function listClipsCursor(opts: Parameters<typeof repo.listCursor>[0]) {
+  return repo.listCursor(opts);
+}
+
 export async function getClip(id: number) {
   const clip = await repo.findById(id);
   if (!clip) throw new NotFoundError("Clip not found");
@@ -24,7 +28,7 @@ export async function updateClip(
   data: Parameters<typeof repo.update>[1],
 ) {
   const clip = await getClip(id);
-  if (clip.userId !== currentUserId) throw new ForbiddenError();
+  if (String(clip.userId) !== String(currentUserId)) throw new ForbiddenError();
   return repo.update(id, data);
 }
 
@@ -34,10 +38,12 @@ export async function deleteClip(
   hard = false,
 ) {
   const clip = await getClip(id);
-  if (clip.userId !== currentUserId) throw new ForbiddenError();
+  if (String(clip.userId) !== String(currentUserId)) throw new ForbiddenError();
   return hard ? repo.hardDelete(id) : repo.softDelete(id);
 }
 
 export function incrementClipViews(id: number, by = 1n) {
-  return repo.incrementViews(id, by);
+  return repo.incrementViews(id, by).then((result) => {
+    if (result.count === 0) throw new NotFoundError("Clip not found");
+  });
 }

@@ -20,13 +20,13 @@
 - 現在の仕様書の正本
 - 単なる作業ログ
 
-恒久的な全体説明は、引き続き [../READMEFORLLM.md](../READMEFORLLM.md) を優先します。
+恒久的な全体説明は、引き続き [../readme-for-llm.md](../readme-for-llm.md) を優先します。
 
 ## ファイル構成
 
-- [CONVENTIONS.md](./CONVENTIONS.md)
+- [conventions.md](./conventions.md)
   LLM 調査メモの記法と運用ルール
-- [TEMPLATE.md](./TEMPLATE.md)
+- [template.md](./template.md)
   新規メモ作成テンプレート
 - [2026-04-01-product-direction.md](./2026-04-01-product-direction.md)
   現状コードベースの方向性に関する初回調査メモ
@@ -50,12 +50,12 @@
 ## 使い分け
 
 - 長期的に参照される確定情報:
-  `docs/READMEFORLLM.md` に昇格する
+  `docs/readme-for-llm.md` に昇格する
 - ある時点での調査・比較・検討:
   このフォルダに置く
 
 ## 最低運用
 
-1. `TEMPLATE.md` を複製して新規メモを作る
+1. `template.md` を複製して新規メモを作る
 2. 調査時点、対象範囲、結論、根拠を埋める
-3. 安定情報に育ったら `docs/READMEFORLLM.md` へ昇格する
+3. 安定情報に育ったら `docs/readme-for-llm.md` へ昇格する

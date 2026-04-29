@@ -63,6 +63,6 @@ Inference: Keeping `Clip.user` during the transition is less risky than rewritin
 
 ## Related
 
-- `docs/READMEFORLLM.md`
+- `docs/readme-for-llm.md`
 - `docs/llm-research/2026-04-06-chrome-extension-connection-research.md`
-- `docs/llm-research/CONVENTIONS.md`
+- `docs/llm-research/conventions.md`

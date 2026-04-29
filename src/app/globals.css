@@ -178,10 +178,37 @@ padding: 10px;
 border: 1px solid #ccc;
 }
 .change-button {
-       float: right;
        padding: 5px 10px;
        font-size: 14px;
        cursor: pointer;
+}
+.change-button:disabled {
+       cursor: not-allowed;
+       opacity: 0.65;
+}
+.nickname-form {
+       align-items: center;
+       display: flex;
+       flex-wrap: wrap;
+       gap: 8px;
+}
+.nickname-display {
+       align-items: center;
+       display: flex;
+       flex-wrap: wrap;
+       gap: 8px;
+}
+.nickname-input {
+       border: 1px solid #ccc;
+       border-radius: 4px;
+       font-size: 14px;
+       min-width: 220px;
+       padding: 6px 8px;
+}
+.nickname-message {
+       color: #555;
+       flex-basis: 100%;
+       font-size: 13px;
 }
 /* login画面のコンテンツ */
 .login-container-test {

@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import {
+  cursorPaginationQuerySchema,
   hardDeleteQuerySchema,
   idSchema,
   includeDeletedQuerySchema,
@@ -16,6 +17,13 @@ export const playlistListQuerySchema = paginationQuerySchema
     userId: idSchema.optional(),
     name: z.string().optional(),
   });
+
+export const playlistCursorListQuerySchema = cursorPaginationQuerySchema
+  .extend({
+    userId: idSchema.optional(),
+    name: z.string().optional(),
+  })
+  .strict();
 
 export const playlistCreateBodySchema = z
   .object({ name: z.string().max(255) })
@@ -42,10 +50,15 @@ export const playlistVodParamSchema = playlistIdParamSchema.extend({
 });
 
 export const playlistChildrenQuerySchema = paginationQuerySchema;
+export const playlistChildrenCursorQuerySchema =
+  cursorPaginationQuerySchema.strict();
 
 export const playlistDeleteQuerySchema = hardDeleteQuerySchema;
 
 export type PlaylistListQuery = z.infer<typeof playlistListQuerySchema>;
+export type PlaylistCursorListQuery = z.infer<
+  typeof playlistCursorListQuerySchema
+>;
 export type PlaylistCreateBody = z.infer<typeof playlistCreateBodySchema>;
 export type PlaylistUpdateBody = z.infer<typeof playlistUpdateBodySchema>;
 export type PlaylistIdParam = z.infer<typeof playlistIdParamSchema>;
@@ -54,4 +67,7 @@ export type PlaylistVodBody = z.infer<typeof playlistVodBodySchema>;
 export type PlaylistClipParam = z.infer<typeof playlistClipParamSchema>;
 export type PlaylistVodParam = z.infer<typeof playlistVodParamSchema>;
 export type PlaylistChildrenQuery = z.infer<typeof playlistChildrenQuerySchema>;
+export type PlaylistChildrenCursorQuery = z.infer<
+  typeof playlistChildrenCursorQuerySchema
+>;
 export type PlaylistDeleteQuery = z.infer<typeof playlistDeleteQuerySchema>;

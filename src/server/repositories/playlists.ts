@@ -3,7 +3,7 @@ import { prisma } from "@/server/db";
 import { type CursorPayload, encodeCursor } from "@/server/http/pagination";
 
 export function findById(id: number) {
-  return prisma.playlist.findUnique({ where: { id } });
+  return prisma.playlist.findFirst({ where: { id, deletedAt: null } });
 }
 
 export async function list(
@@ -158,6 +158,46 @@ export async function listClips(
   return { data, total };
 }
 
+export async function listClipsCursor(
+  playlistId: number,
+  opts: { cursor?: CursorPayload | null; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorId = opts.cursor ? Number.parseInt(opts.cursor.i, 10) : undefined;
+  const where: Prisma.ClipPlaylistWhereInput = {
+    playlistId,
+    deletedAt: null,
+    clip: { deletedAt: null },
+  };
+
+  if (cursorDate && cursorId != null && Number.isFinite(cursorId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        AND: [{ createdAt: cursorDate }, { clipId: { lt: cursorId } }],
+      },
+    ];
+  }
+
+  const rels = await prisma.clipPlaylist.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { clipId: "desc" }],
+    include: { clip: true },
+  });
+
+  const hasNext = rels.length > limit;
+  const page = hasNext ? rels.slice(0, limit) : rels;
+  const last = page.at(-1);
+
+  return {
+    data: page.map((r) => r.clip) as Clip[],
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.clipId) : null,
+  };
+}
+
 export async function addVodIfActive(playlistId: number, vodId: number) {
   const rows = await prisma.$queryRaw<ActiveInsertResult[]>`
     WITH active AS (
@@ -208,4 +248,43 @@ export async function listVods(
   ]);
   const data = rels.map((r) => r.vod) as Vod[];
   return { data, total };
+}
+
+export async function listVodsCursor(
+  playlistId: number,
+  opts: { cursor?: CursorPayload | null; limit?: number } = {},
+) {
+  const limit = opts.limit ?? 20;
+  const cursorDate = opts.cursor ? new Date(opts.cursor.c) : null;
+  const cursorId = opts.cursor ? Number.parseInt(opts.cursor.i, 10) : undefined;
+  const where: Prisma.PlaylistVodWhereInput = {
+    playlistId,
+    vod: { deletedAt: null },
+  };
+
+  if (cursorDate && cursorId != null && Number.isFinite(cursorId)) {
+    where.OR = [
+      { createdAt: { lt: cursorDate } },
+      {
+        AND: [{ createdAt: cursorDate }, { vodId: { lt: cursorId } }],
+      },
+    ];
+  }
+
+  const rels = await prisma.playlistVod.findMany({
+    where,
+    take: limit + 1,
+    orderBy: [{ createdAt: "desc" }, { vodId: "desc" }],
+    include: { vod: true },
+  });
+
+  const hasNext = rels.length > limit;
+  const page = hasNext ? rels.slice(0, limit) : rels;
+  const last = page.at(-1);
+
+  return {
+    data: page.map((r) => r.vod) as Vod[],
+    hasNext,
+    nextCursor: last ? encodeCursor(last.createdAt, last.vodId) : null,
+  };
 }

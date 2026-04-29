@@ -76,6 +76,14 @@ export function listPlaylistClips(
   return repo.listClips(playlistId, opts);
 }
 
+export async function listPlaylistClipsCursor(
+  playlistId: number,
+  opts?: Parameters<typeof repo.listClipsCursor>[1],
+) {
+  await getPlaylist(playlistId);
+  return repo.listClipsCursor(playlistId, opts);
+}
+
 export async function addVodToPlaylist(
   currentUserId: number,
   playlistId: number,
@@ -103,4 +111,12 @@ export function listPlaylistVods(
   opts?: Parameters<typeof repo.listVods>[1],
 ) {
   return repo.listVods(playlistId, opts);
+}
+
+export async function listPlaylistVodsCursor(
+  playlistId: number,
+  opts?: Parameters<typeof repo.listVodsCursor>[1],
+) {
+  await getPlaylist(playlistId);
+  return repo.listVodsCursor(playlistId, opts);
 }

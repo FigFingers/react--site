@@ -5,9 +5,9 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 ## Summary
 
 - OpenAPI defines 54 operations.
-- Current `/api/v1` implementation provides 22 operations.
+- Current `/api/v1` implementation provides 26 operations.
 - All currently implemented `/api/v1` operations are present in `openapi/v1.yaml`.
-- 32 OpenAPI operations are not yet implemented.
+- 28 OpenAPI operations are not yet implemented.
 
 ## Implemented
 
@@ -35,6 +35,10 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 | GET | `/vods` | `vods.list` | `src/app/api/v1/vods/route.ts` |
 | GET | `/vods/{vodId}` | `vods.get` | `src/app/api/v1/vods/[vodId]/route.ts` |
 | GET | `/vods/{vodId}/aliases` | `vods.aliases.list` | `src/app/api/v1/vods/[vodId]/aliases/route.ts` |
+| GET | `/playlists` | `playlists.list` | `src/app/api/v1/playlists/route.ts` |
+| GET | `/playlists/{playlistId}` | `playlists.get` | `src/app/api/v1/playlists/[playlistId]/route.ts` |
+| GET | `/playlists/{playlistId}/clips` | `playlists.clips.list` | `src/app/api/v1/playlists/[playlistId]/clips/route.ts` |
+| GET | `/playlists/{playlistId}/vods` | `playlists.vods.list` | `src/app/api/v1/playlists/[playlistId]/vods/route.ts` |
 
 ## Missing From Implementation
 
@@ -51,15 +55,11 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 | VODs | POST | `/vods/{vodId}/aliases` | `vods.aliases.create` | `admin` |
 | VODs | PATCH | `/vods/{vodId}/aliases/{aliasId}` | `vods.aliases.update` | `admin` |
 | VODs | DELETE | `/vods/{vodId}/aliases/{aliasId}` | `vods.aliases.delete` | `admin` |
-| Playlists | GET | `/playlists` | `playlists.list` | `public` |
 | Playlists | POST | `/playlists` | `playlists.create` | `auth` |
-| Playlists | GET | `/playlists/{playlistId}` | `playlists.get` | `public` |
 | Playlists | PATCH | `/playlists/{playlistId}` | `playlists.update` | `ownerOrAdmin` |
 | Playlists | DELETE | `/playlists/{playlistId}` | `playlists.delete` | `ownerOrAdmin` |
-| Playlists | GET | `/playlists/{playlistId}/clips` | `playlists.clips.list` | `public` |
 | Playlists | POST | `/playlists/{playlistId}/clips` | `playlists.clips.add` | `ownerOrAdmin` |
 | Playlists | DELETE | `/playlists/{playlistId}/clips/{clipId}` | `playlists.clips.remove` | `ownerOrAdmin` |
-| Playlists | GET | `/playlists/{playlistId}/vods` | `playlists.vods.list` | `public` |
 | Playlists | POST | `/playlists/{playlistId}/vods` | `playlists.vods.add` | `ownerOrAdmin` |
 | Playlists | DELETE | `/playlists/{playlistId}/vods/{vodId}` | `playlists.vods.remove` | `ownerOrAdmin` |
 | Users | GET | `/users/{userId}/vods` | `users.vods.list` | `owner` |
@@ -78,7 +78,7 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 Likely straightforward route additions because service/schema/repository code already exists:
 
 - `/vods` and `/vods/{vodId}/aliases` write endpoints, once admin authorization exists.
-- `/playlists`, `/playlists/{playlistId}`, `/playlists/{playlistId}/clips`, `/playlists/{playlistId}/vods`
+- `/playlists` write endpoints, once owner/admin authorization is completed.
 - `/favorites/clips`, `/favorites/playlists`, if these are intended as aliases for the implemented `/me/favorites/*` endpoints.
 - `/users/{userId}/vods`, if these are intended as aliases for the implemented `/me/vods` endpoints with owner checks.
 
@@ -95,5 +95,6 @@ Needs design or policy work before implementation:
 - Current implemented `/me/*` list endpoints use cursor pagination and return `{ data, meta }`.
 - Current implemented `/clips` list endpoint uses cursor pagination and returns `{ data, meta }`.
 - Current implemented `/vods` and `/vods/{vodId}/aliases` list endpoints use cursor pagination and return `{ data, meta }`.
+- Current implemented `/playlists`, `/playlists/{playlistId}/clips`, and `/playlists/{playlistId}/vods` list endpoints use cursor pagination and return `{ data, meta }`.
 - `PATCH /clips/{clipId}` and `DELETE /clips/{clipId}` are implemented with owner checks only; admin bypass still depends on future admin authorization.
 - Some non-`/me` schemas currently use offset pagination (`page`, `pageSize`), which does not match `openapi/v1.yaml`.

@@ -33,7 +33,7 @@ export const { GET, POST } = createRouteHandlers({
   POST: async (req) => {
     const userId = await requireUserId();
     const body = await parseJsonBody(req, clipCreateBodySchema);
-    const clip = await createClip(Number(userId), body);
+    const clip = await createClip(userId, body);
     return json(clip, { status: 201 });
   },
 });

@@ -51,6 +51,12 @@ export function createVodAlias(vodId: number, alias: string) {
   return repo.createAlias(vodId, alias);
 }
 
+export async function resolveVodIdByLookup(value: string) {
+  const vodId = await repo.findActiveIdByLookup(value);
+  if (vodId == null) throw new NotFoundError("VOD not found");
+  return vodId;
+}
+
 export function updateVodAlias(
   aliasId: number,
   data: Parameters<typeof repo.updateAlias>[1],

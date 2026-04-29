@@ -153,6 +153,30 @@ export function createAlias(vodId: number, alias: string) {
   return prisma.vodAlias.create({ data: { vodId, alias } });
 }
 
+export async function findActiveIdByLookup(value: string) {
+  const query = value.trim();
+  if (query === "") return null;
+
+  const vod = await prisma.vod.findFirst({
+    where: {
+      deletedAt: null,
+      OR: [
+        { code: { equals: query, mode: "insensitive" } },
+        { name: { equals: query, mode: "insensitive" } },
+        {
+          vodAliases: {
+            some: { alias: { equals: query, mode: "insensitive" } },
+          },
+        },
+      ],
+    },
+    select: { id: true },
+    orderBy: { id: "asc" },
+  });
+
+  return vod?.id ?? null;
+}
+
 export function updateAlias(aliasId: number, data: { alias?: string }) {
   return prisma.vodAlias.update({ where: { id: aliasId }, data });
 }

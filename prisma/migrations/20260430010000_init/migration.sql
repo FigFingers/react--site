@@ -8,6 +8,9 @@ CREATE EXTENSION IF NOT EXISTS citext;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 -- GENERATED_EXTENSIONS_END 9aefe61c5d99
 
+-- CreateSchema
+CREATE SCHEMA IF NOT EXISTS "public";
+
 -- CreateTable
 CREATE TABLE "users" (
     "id" BIGSERIAL NOT NULL,
@@ -124,6 +127,42 @@ CREATE TABLE "favorite_playlists" (
 );
 
 -- CreateTable
+CREATE TABLE "linked_extensions" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "extension_instance_id" UUID NOT NULL,
+    "extension_auth_hash" VARCHAR(64) NOT NULL,
+    "linked_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "last_seen_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "revoked_at" TIMESTAMPTZ(6),
+
+    CONSTRAINT "linked_extensions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "extension_link_tokens" (
+    "id" BIGSERIAL NOT NULL,
+    "user_id" BIGINT NOT NULL,
+    "token_hash" VARCHAR(64) NOT NULL,
+    "expires_at" TIMESTAMPTZ(6) NOT NULL,
+    "used_at" TIMESTAMPTZ(6),
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "extension_link_tokens_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "sync_receipts" (
+    "id" BIGSERIAL NOT NULL,
+    "linked_extension_id" BIGINT NOT NULL,
+    "client_item_id" UUID NOT NULL,
+    "item_type" VARCHAR(50) NOT NULL,
+    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "sync_receipts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
 CREATE TABLE "accounts" (
     "id" SERIAL NOT NULL,
     "user_id" BIGINT NOT NULL,
@@ -191,6 +230,18 @@ CREATE INDEX "favorite_playlists_user_id_created_at_idx" ON "favorite_playlists"
 CREATE INDEX "favorite_playlists_playlist_id_idx" ON "favorite_playlists"("playlist_id");
 
 -- CreateIndex
+CREATE INDEX "extension_link_tokens_user_id_expires_at_idx" ON "extension_link_tokens"("user_id", "expires_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "extension_link_tokens_token_hash_key" ON "extension_link_tokens"("token_hash");
+
+-- CreateIndex
+CREATE INDEX "sync_receipts_linked_extension_id_created_at_idx" ON "sync_receipts"("linked_extension_id", "created_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sync_receipts_linked_extension_id_client_item_id_key" ON "sync_receipts"("linked_extension_id", "client_item_id");
+
+-- CreateIndex
 CREATE INDEX "accounts_user_id_idx" ON "accounts"("user_id");
 
 -- CreateIndex
@@ -251,12 +302,21 @@ ALTER TABLE "favorite_playlists" ADD CONSTRAINT "favorite_playlists_user_id_fkey
 ALTER TABLE "favorite_playlists" ADD CONSTRAINT "favorite_playlists_playlist_id_fkey" FOREIGN KEY ("playlist_id") REFERENCES "playlists"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "linked_extensions" ADD CONSTRAINT "linked_extensions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "extension_link_tokens" ADD CONSTRAINT "extension_link_tokens_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sync_receipts" ADD CONSTRAINT "sync_receipts_linked_extension_id_fkey" FOREIGN KEY ("linked_extension_id") REFERENCES "linked_extensions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "accounts" ADD CONSTRAINT "accounts_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
--- GENERATED_AUGMENT_BEGIN 9e912148d48b
+-- GENERATED_AUGMENT_BEGIN eb5be8940c8b
 -- 以下は schema.prisma の注釈から自動生成されています (partialIndex/partialUnique/raw/drop)
 -- kind: partialIndex
 CREATE INDEX clips_user_id_created_at_idx
@@ -272,6 +332,11 @@ CREATE INDEX clips_vod_id_created_at_idx
 CREATE INDEX playlists_user_id_created_at_idx
   ON "public"."playlists"("user_id","created_at")
   WHERE deleted_at IS NULL;
+
+-- kind: partialIndex
+CREATE INDEX linked_extensions_user_id_last_seen_active_idx
+  ON "public"."linked_extensions"("user_id","last_seen_at")
+  WHERE revoked_at IS NULL;
 
 -- kind: partialUnique
 CREATE UNIQUE INDEX users_email_unique_active
@@ -293,6 +358,11 @@ CREATE UNIQUE INDEX playlists_user_id_name_unique_active
   ON "public"."playlists"("user_id","name")
   WHERE deleted_at IS NULL;
 
+-- kind: partialUnique
+CREATE UNIQUE INDEX linked_extensions_extension_instance_id_active_unique
+  ON "public"."linked_extensions"("extension_instance_id")
+  WHERE revoked_at IS NULL;
+
 -- kind: raw
 ALTER TABLE "public"."clips"
   ADD CONSTRAINT clips_time_ck CHECK (start_ms >= 0 AND end_ms > start_ms);
@@ -301,4 +371,4 @@ ALTER TABLE "public"."clips"
 CREATE INDEX IF NOT EXISTS clips_title_trgm_gin
   ON "public"."clips" USING GIN (title gin_trgm_ops)
   WHERE deleted_at IS NULL;
--- GENERATED_AUGMENT_END 9e912148d48b
+-- GENERATED_AUGMENT_END eb5be8940c8b

@@ -18,13 +18,13 @@ export const { GET, PATCH, DELETE } = createRouteHandlers({
     const userId = await requireUserId();
     const params = parseRouteParams(context.params, clipIdParamSchema);
     const body = await parseJsonBody(req, clipUpdateBodySchema);
-    const clip = await updateClip(Number(userId), params.clipId, body);
+    const clip = await updateClip(userId, params.clipId, body);
     return json(clip);
   },
   DELETE: async (_req, context) => {
     const userId = await requireUserId();
     const params = parseRouteParams(context.params, clipIdParamSchema);
-    await deleteClip(Number(userId), params.clipId);
+    await deleteClip(userId, params.clipId);
     return new Response(null, { status: 204 });
   },
 });

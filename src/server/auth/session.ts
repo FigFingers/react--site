@@ -6,6 +6,8 @@ import { auth } from "@/auth";
 import { prisma } from "@/server/db";
 import { UnauthorizedError } from "@/server/http/errors";
 
+export type UserId = number;
+
 //    - API などで「外に出して良いユーザー情報」の標準形
 //    - hashedPassword / deletedAt は除外
 export type SafeUser = Omit<User, "hashedPassword" | "deletedAt">;
@@ -35,11 +37,8 @@ export async function getCurrentUser<T extends UserSafeSelect>(
   select?: T,
 ): Promise<SafeUser | Prisma.UserGetPayload<{ select: T }> | null> {
   const session = await getSession();
-  const rawId = session?.user?.id;
-  if (!rawId) return null;
-
-  const userId = typeof rawId === "string" ? Number.parseInt(rawId, 10) : rawId;
-  if (!Number.isFinite(userId)) return null;
+  const userId = parseSessionUserId(session?.user?.id);
+  if (userId == null) return null;
 
   // ソフトデリート対応: deletedAt が null のユーザーだけを許可
   if (select) {
@@ -92,7 +91,7 @@ export async function requireUserId() {
 //    - パスワード比較/変更など、hashedPassword が本当に必要なとき専用
 //    - 普通の API からは使わない
 //    - ソフトデリート済みユーザーは除外
-export function getUserWithPassword(userId: number) {
+export function getUserWithPassword(userId: UserId) {
   return prisma.user.findFirst({
     where: { id: userId, deletedAt: null },
     select: {
@@ -100,4 +99,17 @@ export function getUserWithPassword(userId: number) {
       hashedPassword: true,
     },
   });
+}
+
+function parseSessionUserId(value: unknown): UserId | null {
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) ? value : null;
+  }
+
+  if (typeof value === "string" && value.trim() !== "") {
+    const parsed = Number.parseInt(value, 10);
+    return Number.isSafeInteger(parsed) ? parsed : null;
+  }
+
+  return null;
 }

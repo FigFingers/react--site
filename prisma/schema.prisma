@@ -36,6 +36,8 @@ model User {
   favoriteClips     FavoriteClip[]
   favoritePlaylists FavoritePlaylist[]
   usersVods         UserVod[]
+  linkedExtensions  LinkedExtension[]
+  extensionLinkTokens ExtensionLinkToken[]
 
   /// @@partialUnique([email])
   @@map("users")
@@ -184,6 +186,52 @@ model FavoritePlaylist {
   @@index([userId, createdAt])
   @@index([playlistId])
   @@map("favorite_playlists")
+}
+
+model LinkedExtension {
+  id                  BigInt    @id @default(autoincrement()) @db.BigInt
+  userId              BigInt    @map("user_id") @db.BigInt
+  extensionInstanceId String    @map("extension_instance_id") @db.Uuid
+  extensionAuthHash   String    @map("extension_auth_hash") @db.VarChar(64)
+  linkedAt            DateTime  @default(now()) @map("linked_at") @db.Timestamptz(6)
+  lastSeenAt          DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt           DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncReceipts SyncReceipt[]
+
+  /// @@partialUnique([extensionInstanceId], name: "linked_extensions_extension_instance_id_active_unique", where: "revoked_at IS NULL")
+  /// @@partialIndex([userId, lastSeenAt], name: "linked_extensions_user_id_last_seen_active_idx", where: "revoked_at IS NULL")
+  @@map("linked_extensions")
+}
+
+model ExtensionLinkToken {
+  id        BigInt    @id @default(autoincrement()) @db.BigInt
+  userId    BigInt    @map("user_id") @db.BigInt
+  tokenHash String    @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([userId, expiresAt])
+  @@map("extension_link_tokens")
+}
+
+model SyncReceipt {
+  id                BigInt   @id @default(autoincrement()) @db.BigInt
+  linkedExtensionId BigInt   @map("linked_extension_id") @db.BigInt
+  clientItemId      String   @map("client_item_id") @db.Uuid
+  itemType          String   @map("item_type") @db.VarChar(50)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  linkedExtension LinkedExtension @relation(fields: [linkedExtensionId], references: [id], onDelete: Cascade)
+
+  @@unique([linkedExtensionId, clientItemId])
+  @@index([linkedExtensionId, createdAt])
+  @@map("sync_receipts")
 }
 
 // NextAuth モデル

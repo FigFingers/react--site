@@ -448,6 +448,124 @@ components:
             - string
             - "null"
       additionalProperties: false
+    ExtensionSession:
+      type: object
+      properties:
+        loggedIn:
+          type: boolean
+      required:
+        - loggedIn
+      additionalProperties: false
+    ExtensionLinkTokenResponse:
+      type: object
+      properties:
+        linkToken:
+          type: string
+        expiresAt:
+          $ref: "#/components/schemas/DateTime"
+      required:
+        - linkToken
+        - expiresAt
+      additionalProperties: false
+    ExtensionLinkRequest:
+      type: object
+      required:
+        - extensionInstanceId
+        - linkToken
+      properties:
+        extensionInstanceId:
+          type: string
+          format: uuid
+        linkToken:
+          type: string
+      additionalProperties: false
+    ExtensionLinkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        extensionAuthToken:
+          type: string
+      required:
+        - ok
+        - extensionAuthToken
+      additionalProperties: false
+    ExtensionSyncClipPayload:
+      type: object
+      required:
+        - service
+        - StartTime
+        - EndTime
+        - URL
+        - title
+      properties:
+        clipName:
+          type: string
+          maxLength: 255
+        service:
+          type: string
+        StartTime:
+          type: number
+          minimum: 0
+        EndTime:
+          type: number
+          minimum: 0
+        URL:
+          type: string
+        title:
+          type: string
+        epnumber:
+          type: string
+      additionalProperties: false
+    ExtensionSyncItem:
+      type: object
+      required:
+        - clientItemId
+        - type
+        - payload
+      properties:
+        clientItemId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - clip
+        createdAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+        payload:
+          $ref: "#/components/schemas/ExtensionSyncClipPayload"
+      additionalProperties: false
+    ExtensionSyncRequest:
+      type: object
+      required:
+        - extensionInstanceId
+        - items
+      properties:
+        extensionInstanceId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtensionSyncItem"
+      additionalProperties: false
+    ExtensionSyncResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        acceptedItemIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - ok
+        - acceptedItemIds
+      additionalProperties: false
     Playlist:
       type: object
       properties:
@@ -509,6 +627,99 @@ paths:
                     example: ok
         "400":
           $ref: "#/components/responses/BadRequest"
+  /extension/session:
+    get:
+      operationId: extension.session
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Check whether the current browser session is logged in for extension handoff
+      security:
+        - nextAuthSession: []
+      responses:
+        "200":
+          description: Session state for extension connection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionSession"
+        "403":
+          $ref: "#/components/responses/Unauthorized"
+  /extension/link-token:
+    post:
+      operationId: extension.linkToken.issue
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Issue a single-use link token for extension connection
+      security:
+        - nextAuthSession: []
+      responses:
+        "200":
+          description: Link token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionLinkTokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Unauthorized"
+  /extension/link:
+    post:
+      operationId: extension.link
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Consume a link token and bind one extension instance to the current user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtensionLinkRequest"
+      responses:
+        "200":
+          description: Extension linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionLinkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /extension/sync:
+    post:
+      operationId: extension.sync
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Sync clips from a linked extension instance using bearer auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtensionSyncRequest"
+      responses:
+        "200":
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionSyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
   /me:
     get:
       operationId: users.meGet

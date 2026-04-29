@@ -1,4 +1,3 @@
-// src/auth.ts (NextAuth v5, JWT session, PrismaAdapter)
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
@@ -6,6 +5,13 @@ import { prisma } from "@/server/db";
 
 const googleClientId = process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
+const authUrl = process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? "";
+const isCrossSiteAuth =
+  process.env.NODE_ENV === "production" || authUrl.startsWith("https://");
+const sessionCookieName = isCrossSiteAuth
+  ? "__Secure-authjs.session-token"
+  : "authjs.session-token";
+const sessionCookieSameSite = isCrossSiteAuth ? "none" : "lax";
 
 if (!googleClientId || !googleClientSecret) {
   throw new Error(
@@ -17,8 +23,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   trustHost: true,
-  // 明示しなくても ENV の AUTH_SECRET/NEXTAUTH_SECRET を読むが、指定してもOK
   secret: process.env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
+  cookies: {
+    sessionToken: {
+      name: sessionCookieName,
+      options: {
+        httpOnly: true,
+        sameSite: sessionCookieSameSite,
+        path: "/",
+        secure: isCrossSiteAuth,
+      },
+    },
+  },
 
   providers: [
     Google({
@@ -34,25 +50,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
 
   callbacks: {
-    // 🔹 JWT に必ず uid を載せる
     async jwt({ token, user }) {
-      // ① 初回ログイン時（user がいるとき）は、素直に user.id を詰める
       if (user && user.id != null) {
-        token.uid = String(user.id); // そのまま string
+        token.uid = String(user.id);
       }
 
-      // ② それでも uid が無い場合は、email から DB を引いて補完する
       if (token.uid == null && token.email) {
         const dbUser = await prisma.user.findFirst({
           where: {
             email: token.email,
-            deletedAt: null, // ← 部分ユニークの条件と揃えれば安全
+            deletedAt: null,
           },
           select: { id: true },
         });
 
         if (!dbUser) {
-          // ログイン済みなのにユーザーが取れないのは明らかに異常なので、ここで落として気付く
           throw new Error("User not found for token.email");
         }
 
@@ -61,12 +73,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       return token;
     },
 
-    // 🔹 Session に uid を反映するだけ
     session({ session, token }) {
       if (!session.user) return session;
 
       if (token.uid == null) {
-        // jwt で必ずセットしている前提なので、入っていないのは異常
         throw new Error("token.uid is missing in session callback");
       }
 

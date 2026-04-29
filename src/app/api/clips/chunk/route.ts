@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { NextRequest } from 'next/server';
+import { resolveCurrentUserDisplayName } from '@/lib/users/displayName';
 
 const CHUNK_SIZE = 100;
 
@@ -20,6 +21,16 @@ export async function GET(req: NextRequest) {
           }
         : {}),
       orderBy: { createdAt: 'desc' },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            nickname: true,
+            email: true,
+          },
+        },
+      },
     });
 
     let nextCursor: number | null = null;
@@ -30,7 +41,12 @@ export async function GET(req: NextRequest) {
     }
 
     // シャッフル（内部順序を少しランダム化）
-    const shuffled = items.sort(() => Math.random() - 0.5);
+    const shuffled = items
+      .map(({ owner, ...clip }) => ({
+        ...clip,
+        user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+      }))
+      .sort(() => Math.random() - 0.5);
 
     return new Response(
       JSON.stringify({

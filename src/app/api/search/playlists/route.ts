@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 
 const CHUNK_SIZE = 100;
 
@@ -37,7 +38,14 @@ export async function GET(req: NextRequest): Promise<Response> {
         : {}),
       where: whereClause,
       include: {
-        user: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            nickname: true,
+            email: true,
+          },
+        },
       },
       orderBy: { id: "desc" },
     });
@@ -58,7 +66,7 @@ export async function GET(req: NextRequest): Promise<Response> {
     const items = playlists.map((p) => ({
       id: p.id,
       name: p.name,                 // ← UI が期待する値
-      user_name: p.user?.name ?? "unknown",
+      user_name: resolveCurrentUserDisplayName(p.user),
       data: String(p.id),           // PlayListDetailページに遷移する slug
     }));
 

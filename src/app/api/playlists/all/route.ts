@@ -1,7 +1,6 @@
-// src/app/api/playlists/all/route.ts
-
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 
 const CHUNK_SIZE = 100;
 
@@ -12,9 +11,6 @@ export async function GET(req: NextRequest) {
   const cursor = cursorParam ? Number(cursorParam) : null;
 
   try {
-    // --------------------------------------------------
-    // Prisma で cursor-based pagination
-    // --------------------------------------------------
     const playlists = await prisma.playlist.findMany({
       take: CHUNK_SIZE + 1,
       ...(cursor
@@ -25,7 +21,14 @@ export async function GET(req: NextRequest) {
         : {}),
       orderBy: { updatedAt: "desc" },
       include: {
-        user: true, // user.name を得るため
+        user: {
+          select: {
+            id: true,
+            name: true,
+            nickname: true,
+            email: true,
+          },
+        },
         clips: {
           select: {
             clip: {
@@ -33,32 +36,41 @@ export async function GET(req: NextRequest) {
                 title: true,
                 service: true,
                 user: true,
+                owner: {
+                  select: {
+                    id: true,
+                    name: true,
+                    nickname: true,
+                    email: true,
+                  },
+                },
               },
             },
           },
-          take: 3, // 軽量用の代表3件（元仕様を保持）
+          take: 3,
         },
       },
     });
 
-    // --------------------------------------------------
-    // nextCursor 判定
-    // --------------------------------------------------
     let nextCursor: number | null = null;
     if (playlists.length > CHUNK_SIZE) {
       const extra = playlists.pop()!;
       nextCursor = extra.id;
     }
 
-    // --------------------------------------------------
-    // PlayListCluster.tsx が期待する形式にマッピング
-    // --------------------------------------------------
     const items = playlists.map((p) => ({
       id: p.id,
-      name: p.name,                  // PlayListItem に必須
-      user_name: p.user?.name ?? "unknown",
-      data: String(p.id),            // /playlists/[id] へ遷移
-      preview_clips: p.clips?.map((c) => c.clip) ?? [], // 任意: UIでサムネ用途
+      name: p.name,
+      user_name: resolveCurrentUserDisplayName(p.user),
+      data: String(p.id),
+      preview_clips:
+        p.clips?.map(({ clip }) => {
+          const { owner, ...clipData } = clip;
+          return {
+            ...clipData,
+            user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+          };
+        }) ?? [],
     }));
 
     return NextResponse.json({
@@ -69,7 +81,7 @@ export async function GET(req: NextRequest) {
     console.error("playlist all error:", e);
     return NextResponse.json(
       { error: "Failed to fetch playlist data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

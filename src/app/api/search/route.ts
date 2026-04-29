@@ -1,36 +1,25 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 
 const CHUNK_SIZE = 100;
 
 export async function GET(req: NextRequest): Promise<Response> {
-  
   const { searchParams } = new URL(req.url);
 
   const keyword = searchParams.get("q") ?? "";
-  const user = searchParams.get("user") ?? "";
+  const userId = searchParams.get("user") ?? "";
   const cursorParam = searchParams.get("cursor");
-
-  // cursor は number 型
   const cursor = cursorParam ? Number(cursorParam) : null;
 
-  console.log("cursorParam:", cursorParam);
-  console.log("parsed cursor:", cursor);
-
   try {
-    // ================
-    // where 条件
-    // ================
-    const whereClause: any = {
+    const whereClause = {
       title: {
         contains: keyword,
       },
-      ...(user && { user }),
+      ...(userId && { userId }),
     };
 
-    // ================
-    // cursor ページング検索
-    // ================
     const items = await prisma.clip.findMany({
       take: CHUNK_SIZE + 1,
       ...(cursor
@@ -40,30 +29,41 @@ export async function GET(req: NextRequest): Promise<Response> {
           }
         : {}),
       where: whereClause,
-      orderBy: { id: "desc" }, // 安定順序
+      orderBy: { id: "desc" },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            nickname: true,
+            email: true,
+          },
+        },
+      },
     });
 
-    // nextCursor 判定
     let nextCursor: number | null = null;
 
     if (items.length > CHUNK_SIZE) {
-      const extra = items.pop(); // 次page用
+      const extra = items.pop();
       nextCursor = extra!.id;
     }
 
-    // =====================
-    // relevance（軽いスコア調整）
-    // =====================
-    const scored = items.sort((a, b) => {
-      const dist = (t: { title: string }) =>
-        Math.abs(t.title.length - keyword.length);
-      return dist(a) - dist(b);
-    });
+    const scored = items
+      .map(({ owner, ...clip }) => ({
+        ...clip,
+        user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+      }))
+      .sort((a, b) => {
+        const dist = (t: { title: string }) =>
+          Math.abs(t.title.length - keyword.length);
+        return dist(a) - dist(b);
+      });
 
     return new Response(
       JSON.stringify({
-        items: scored,   // clipCluster と完全互換
-        nextCursor,      // search も続きが読める
+        items: scored,
+        nextCursor,
       }),
       {
         status: 200,
@@ -71,18 +71,15 @@ export async function GET(req: NextRequest): Promise<Response> {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
         },
-      }
+      },
     );
   } catch (error) {
-    console.error("検索エラー:", error);
-    return new Response(
-      JSON.stringify({ error: "検索に失敗しました" }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    console.error("search API error:", error);
+    return new Response(JSON.stringify({ error: "Search failed" }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   }
 }

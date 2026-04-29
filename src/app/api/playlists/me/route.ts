@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 
 export async function GET() {
   const session = await auth();
@@ -16,7 +17,7 @@ export async function GET() {
       where: { userId },
       orderBy: { updatedAt: "desc" },
       include: {
-        user: { select: { name: true } },
+        user: { select: { id: true, name: true, nickname: true, email: true } },
         clips: {
           select: {
             clip: {
@@ -24,6 +25,14 @@ export async function GET() {
                 title: true,
                 service: true,
                 user: true,
+                owner: {
+                  select: {
+                    id: true,
+                    name: true,
+                    nickname: true,
+                    email: true,
+                  },
+                },
               },
             },
           },
@@ -38,7 +47,7 @@ export async function GET() {
     const items = playlists.map((p) => ({
       id: p.id,
       name: p.name,                          // ← UI が期待
-      user_name: p.user?.name ?? "Unknown",
+      user_name: resolveCurrentUserDisplayName(p.user),
       data: String(p.id),                    // /playlists/[id] 遷移用
       icon: p.clips[0]?.clip.service ?? "unknown",
     }));

@@ -171,7 +171,7 @@ return {ok:true,extensionAuthToken};
 }
 
 export async function authenticateLinkedExtension(args){
-const linkedExtension=await prisma.linkedExtension.findUnique({where:{extensionInstanceId:args.extensionInstanceId},select:{id:true,userId:true,extensionInstanceId:true,extensionAuthHash:true,revokedAt:true,user:{select:{id:true,name:true,email:true}}}});
+const linkedExtension=await prisma.linkedExtension.findUnique({where:{extensionInstanceId:args.extensionInstanceId},select:{id:true,userId:true,extensionInstanceId:true,extensionAuthHash:true,revokedAt:true,user:{select:{id:true,name:true,nickname:true,email:true}}}});
 if(!linkedExtension||linkedExtension.revokedAt){
 return {ok:false,status:401,message:"Unauthorized"};
 }

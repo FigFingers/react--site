@@ -1,12 +1,27 @@
 import { prisma } from '@/lib/prisma';
+import { resolveCurrentUserDisplayName } from '@/lib/users/displayName';
 
 export async function GET() {
   try {
     const clips = await prisma.clip.findMany({
       orderBy: { createdAt: 'desc' },
+      include: {
+        owner: {
+          select: {
+            id: true,
+            name: true,
+            nickname: true,
+            email: true,
+          },
+        },
+      },
     });
+    const items = clips.map(({ owner, ...clip }) => ({
+      ...clip,
+      user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+    }));
 
-    return new Response(JSON.stringify({ allReceivedData: clips }), {
+    return new Response(JSON.stringify({ allReceivedData: items }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

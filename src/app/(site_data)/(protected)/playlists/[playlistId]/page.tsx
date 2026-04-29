@@ -4,6 +4,7 @@ export const fetchCache = "force-no-store";
 
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 // ✅ dynamic import やめる
 import PlaylistView from "./PlaylistView.client"; 
 
@@ -22,14 +23,41 @@ export default async function PlaylistPage({ params }) {
       userId: true,
       clips: {
         orderBy: { order: "asc" },
-        include: { clip: true },
+        include: {
+          clip: {
+            include: {
+              owner: {
+                select: {
+                  id: true,
+                  name: true,
+                  nickname: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
       },
     },
   });
 
   if (!playlist) return <div>Not Found</div>;
 
-  const serialized = JSON.parse(JSON.stringify(playlist));
+  const playlistWithCurrentClipUsers = {
+    ...playlist,
+    clips: playlist.clips.map((playlistClip) => {
+      const { owner, ...clip } = playlistClip.clip;
+      return {
+        ...playlistClip,
+        clip: {
+          ...clip,
+          user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+        },
+      };
+    }),
+  };
+
+  const serialized = JSON.parse(JSON.stringify(playlistWithCurrentClipUsers));
 
 
   return (

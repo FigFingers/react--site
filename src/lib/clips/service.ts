@@ -2,12 +2,14 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { CanonicalClipInput } from "@/lib/clips/contract";
 import type { ClipUserInfo } from "@/lib/clips/user";
+import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
 
 type ClipDbClient = typeof prisma | Prisma.TransactionClient;
 
 type ClipIdentityUser = {
   id: string;
   name?: string | null;
+  nickname?: string | null;
   email?: string | null;
 };
 
@@ -27,25 +29,16 @@ type PersistableClipInput = CanonicalClipInput & {
   createdAt?: Date | null;
 };
 
-function normalizeText(value: string | null | undefined) {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-export function resolveClipOwnerDisplayName(
+function resolveClipOwnerDisplayName(
   user: Partial<ClipIdentityUser> | null | undefined
 ) {
-  return normalizeText(user?.name);
+  return resolveCurrentUserDisplayName(user);
 }
 
 export function resolveClipOwnerName(
   user: Partial<ClipIdentityUser> | null | undefined
 ) {
-  return resolveClipOwnerDisplayName(user) ?? normalizeText(user?.id) ?? "unknown";
+  return resolveClipOwnerDisplayName(user);
 }
 
 function buildClipUserInfo(args: {
@@ -108,11 +101,17 @@ export async function resolveClipWriteOwnerFromSessionUser(
   user: ClipIdentityUser,
   db: ClipDbClient = prisma
 ) {
-  const linkedExtension = await findActiveLinkedExtensionForUser(db, user.id);
+  const [linkedExtension, dbUser] = await Promise.all([
+    findActiveLinkedExtensionForUser(db, user.id),
+    db.user.findUnique({
+      where: { id: user.id },
+      select: { id: true, name: true, nickname: true, email: true },
+    }),
+  ]);
 
   return buildClipWriteOwner({
     userId: user.id,
-    displayName: resolveClipOwnerDisplayName(user),
+    displayName: resolveClipOwnerDisplayName(dbUser ?? user),
     extensionInstanceId: linkedExtension?.extensionInstanceId ?? null,
   });
 }

@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { resolveCurrentUserDisplayName } from '@/lib/users/displayName'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -33,7 +34,19 @@ export async function GET(req) {
     })
   }
 
-  const clip = await prisma.clip.findUnique({ where: { id } })
+  const clip = await prisma.clip.findUnique({
+    where: { id },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          nickname: true,
+          email: true,
+        },
+      },
+    },
+  })
 
   if (!clip) {
     return new Response(JSON.stringify({ error: 'Clip not found' }), {
@@ -45,7 +58,12 @@ export async function GET(req) {
     })
   }
 
-  return new Response(JSON.stringify(clip), {
+  const { owner, ...clipData } = clip
+
+  return new Response(JSON.stringify({
+    ...clipData,
+    user: owner ? resolveCurrentUserDisplayName(owner) : clip.user,
+  }), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',

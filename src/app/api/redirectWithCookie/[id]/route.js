@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { resolveCurrentUserDisplayName } from '@/lib/users/displayName'
 
 export async function GET(request, context) {
   const idParam = context?.params?.id
@@ -9,7 +10,19 @@ export async function GET(request, context) {
     return new Response('Invalid ID', { status: 400 })
   }
 
-  const clip = await prisma.clip.findUnique({ where: { id } })
+  const clip = await prisma.clip.findUnique({
+    where: { id },
+    include: {
+      owner: {
+        select: {
+          id: true,
+          name: true,
+          nickname: true,
+          email: true,
+        },
+      },
+    },
+  })
   if (!clip) {
     return new Response('Clip not found', { status: 404 })
   }
@@ -23,7 +36,7 @@ export async function GET(request, context) {
 
   response.cookies.set('name', '切り抜き', { path: '/', maxAge: 3600 })
   response.cookies.set('title', clip.title || '', { path: '/', maxAge: 3600 })
-  response.cookies.set('username', clip.user || '', { path: '/', maxAge: 3600 })
+  response.cookies.set('username', clip.owner ? resolveCurrentUserDisplayName(clip.owner) : clip.user || '', { path: '/', maxAge: 3600 })
   response.cookies.set('starttime', String(clip.startTime), { path: '/', maxAge: 3600 })
   response.cookies.set('endtime', String(clip.endTime), { path: '/', maxAge: 3600 })
   response.cookies.set('url', clip.url || '', { path: '/', maxAge: 3600 })

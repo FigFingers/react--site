@@ -5,9 +5,9 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 ## Summary
 
 - OpenAPI defines 54 operations.
-- Current `/api/v1` implementation provides 19 operations.
+- Current `/api/v1` implementation provides 22 operations.
 - All currently implemented `/api/v1` operations are present in `openapi/v1.yaml`.
-- 35 OpenAPI operations are not yet implemented.
+- 32 OpenAPI operations are not yet implemented.
 
 ## Implemented
 
@@ -32,6 +32,9 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 | PATCH | `/clips/{clipId}` | `clips.update` | `src/app/api/v1/clips/[clipId]/route.ts` |
 | DELETE | `/clips/{clipId}` | `clips.delete` | `src/app/api/v1/clips/[clipId]/route.ts` |
 | POST | `/clips/{clipId}/view` | `clips.viewIncrement` | `src/app/api/v1/clips/[clipId]/view/route.ts` |
+| GET | `/vods` | `vods.list` | `src/app/api/v1/vods/route.ts` |
+| GET | `/vods/{vodId}` | `vods.get` | `src/app/api/v1/vods/[vodId]/route.ts` |
+| GET | `/vods/{vodId}/aliases` | `vods.aliases.list` | `src/app/api/v1/vods/[vodId]/aliases/route.ts` |
 
 ## Missing From Implementation
 
@@ -42,12 +45,9 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 | Users | GET | `/users/{id}` | `users.get` | `admin` |
 | Users | PATCH | `/users/{id}` | `users.update` | `admin` |
 | Users | DELETE | `/users/{id}` | `users.delete` | `admin` |
-| VODs | GET | `/vods` | `vods.list` | `public` |
 | VODs | POST | `/vods` | `vods.create` | `admin` |
-| VODs | GET | `/vods/{vodId}` | `vods.get` | `public` |
 | VODs | PATCH | `/vods/{vodId}` | `vods.update` | `admin` |
 | VODs | DELETE | `/vods/{vodId}` | `vods.delete` | `admin` |
-| VODs | GET | `/vods/{vodId}/aliases` | `vods.aliases.list` | `public` |
 | VODs | POST | `/vods/{vodId}/aliases` | `vods.aliases.create` | `admin` |
 | VODs | PATCH | `/vods/{vodId}/aliases/{aliasId}` | `vods.aliases.update` | `admin` |
 | VODs | DELETE | `/vods/{vodId}/aliases/{aliasId}` | `vods.aliases.delete` | `admin` |
@@ -77,7 +77,7 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 
 Likely straightforward route additions because service/schema/repository code already exists:
 
-- `/vods`, `/vods/{vodId}`, `/vods/{vodId}/aliases`, `/vods/{vodId}/aliases/{aliasId}`
+- `/vods` and `/vods/{vodId}/aliases` write endpoints, once admin authorization exists.
 - `/playlists`, `/playlists/{playlistId}`, `/playlists/{playlistId}/clips`, `/playlists/{playlistId}/vods`
 - `/favorites/clips`, `/favorites/playlists`, if these are intended as aliases for the implemented `/me/favorites/*` endpoints.
 - `/users/{userId}/vods`, if these are intended as aliases for the implemented `/me/vods` endpoints with owner checks.
@@ -94,5 +94,6 @@ Needs design or policy work before implementation:
 - Existing `/api/v1` implementation follows the shared `createRouteHandlers` pattern and central error handling.
 - Current implemented `/me/*` list endpoints use cursor pagination and return `{ data, meta }`.
 - Current implemented `/clips` list endpoint uses cursor pagination and returns `{ data, meta }`.
+- Current implemented `/vods` and `/vods/{vodId}/aliases` list endpoints use cursor pagination and return `{ data, meta }`.
 - `PATCH /clips/{clipId}` and `DELETE /clips/{clipId}` are implemented with owner checks only; admin bypass still depends on future admin authorization.
 - Some non-`/me` schemas currently use offset pagination (`page`, `pageSize`), which does not match `openapi/v1.yaml`.

@@ -5,6 +5,10 @@ export function listVods(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
 }
 
+export function listVodsCursor(opts: Parameters<typeof repo.listCursor>[0]) {
+  return repo.listCursor(opts);
+}
+
 export async function getVod(id: number) {
   const vod = await repo.findById(id);
   if (!vod) throw new NotFoundError("VOD not found");
@@ -33,6 +37,14 @@ export function listVodAliases(
   opts?: Parameters<typeof repo.listAliases>[1],
 ) {
   return repo.listAliases(vodId, opts);
+}
+
+export async function listVodAliasesCursor(
+  vodId: number,
+  opts?: Parameters<typeof repo.listAliasesCursor>[1],
+) {
+  await getVod(vodId);
+  return repo.listAliasesCursor(vodId, opts);
 }
 
 export function createVodAlias(vodId: number, alias: string) {

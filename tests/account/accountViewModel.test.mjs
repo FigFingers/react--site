@@ -4,7 +4,7 @@ import {
   collectSubscriptionServices,
   formatDateJa,
   formatSubscriptionLabel,
-} from "./accountViewModel.mjs";
+} from "../../src/app/(site_data)/(protected)/account/accountViewModel.mjs";
 
 test("collectSubscriptionServices removes blanks and duplicates", () => {
   const clips = [
@@ -23,7 +23,7 @@ test("collectSubscriptionServices removes blanks and duplicates", () => {
 });
 
 test("formatSubscriptionLabel returns fallback text when empty", () => {
-  assert.equal(formatSubscriptionLabel([]), "未連携（仮表示）");
+  assert.equal(formatSubscriptionLabel([]), "\u672a\u9023\u643a\uff08\u4eee\u8868\u793a\uff09");
 });
 
 test("formatSubscriptionLabel joins labels with slash", () => {

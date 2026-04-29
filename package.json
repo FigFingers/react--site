@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "db:normalize-clip-users": "node scripts/normalize-legacy-clip-users.cjs --write",
-    "test:account": "node --test \"src/app/(site_data)/(protected)/account/accountViewModel.test.mjs\""
+    "test": "npm run test:account && npm run test:search",
+    "test:account": "node --test \"tests/account/accountViewModel.test.mjs\"",
+    "test:search": "node --test \"tests/search/utils.test.mjs\""
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

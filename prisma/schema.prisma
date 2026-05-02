@@ -18,7 +18,7 @@ model Clip {
   endTime       Float
   url           String
   title         String
-  epnumber      String         @default("エピソード不明")
+  epnumber      String?
   createdAt     DateTime       @default(now())
   playlistClips PlaylistClip[]
   owner         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)

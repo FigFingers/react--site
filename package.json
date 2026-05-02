@@ -25,6 +25,7 @@
     "@prisma/client": "^6.14.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "jose": "^6.1.0",
     "next": "^15.1.0",
     "next-auth": "^5.0.0-beta.29",
     "react": "^19.1.1",

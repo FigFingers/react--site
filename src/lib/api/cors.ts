@@ -29,6 +29,13 @@ const origin=request.headers.get("origin");
 if(!origin){
 return true;
 }
+try{
+const requestOrigin=new URL(request.url).origin;
+if(origin===requestOrigin){
+return true;
+}
+}catch{
+}
 return CLIP_WRITE_ALLOWED_ORIGINS_NORMALIZED.includes(origin);
 }
 

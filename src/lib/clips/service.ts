@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { CanonicalClipInput } from "@/lib/clips/contract";
 import type { ClipUserInfo } from "@/lib/clips/user";
 import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
+import { authenticateExtensionAuthToken } from "@/lib/extension/service";
 
 type ClipDbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -116,6 +117,19 @@ export async function resolveClipWriteOwnerFromSessionUser(
   });
 }
 
+export async function resolveClipWriteOwnerFromBearerToken(token: string) {
+  const authResult = await authenticateExtensionAuthToken(token);
+  if (!authResult.ok) return null;
+
+  const linkedExtension = authResult.linkedExtension;
+
+  return buildClipWriteOwner({
+    userId: linkedExtension.userId,
+    displayName: resolveClipOwnerDisplayName(linkedExtension.user),
+    extensionInstanceId: linkedExtension.extensionInstanceId,
+  });
+}
+
 export function resolveClipWriteOwnerFromLinkedExtension(
   linkedExtension: LinkedExtensionOwner
 ) {
@@ -142,9 +156,7 @@ function buildClipCreateData(
     title: clip.title,
   };
 
-  if (clip.epnumber) {
-    data.epnumber = clip.epnumber;
-  }
+  data.epnumber = clip.epnumber ?? undefined;
 
   if (clip.createdAt) {
     data.createdAt = clip.createdAt;

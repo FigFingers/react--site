@@ -1,7 +1,7 @@
 //@ts-nocheck
 import{auth}from"@/auth";
 import{buildExtensionCorsHeaders,isAllowedClipWriteOrigin}from"@/lib/api/cors";
-import{issueExtensionLinkToken}from"@/lib/extension/service";
+import{issueExtensionLinkTokenForUser}from"@/lib/extension/service";
 
 function buildHeaders(req){
 return buildExtensionCorsHeaders(req,{methods:["POST","OPTIONS"]});
@@ -19,7 +19,10 @@ const session=await auth();
 if(!session?.user?.id){
 return json(req,{message:"Unauthorized"},401);
 }
-const result=await issueExtensionLinkToken(session.user.id);
+const result=await issueExtensionLinkTokenForUser({userId:session.user.id,email:session.user.email});
+if(!result){
+return json(req,{message:"Unauthorized"},401);
+}
 return json(req,{linkToken:result.linkToken,expiresAt:result.expiresAt.toISOString()},200);
 }
 

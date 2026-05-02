@@ -1,7 +1,9 @@
 //@ts-nocheck
 import{prisma}from"@/lib/prisma";
 import{normalizeClipBatchPayload}from"@/lib/clips/contract";
+import{Prisma}from"@prisma/client";
 import{createHash,randomBytes,timingSafeEqual}from"node:crypto";
+import{SignJWT,jwtVerify}from"jose";
 
 const LINK_TOKEN_TTL_MS=10*60*1000;
 const UUID_PATTERN=new RegExp("\x5e[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\x24","i");
@@ -67,7 +69,7 @@ export function parseBearerToken(authorizationHeader){
 if(!authorizationHeader){
 return null;
 }
-const match=authorizationHeader.trim().match(/Bearer\s+(.+)$/i);
+const match=authorizationHeader.trim().match(/^Bearer\s+(.+)$/i);
 if(!match){
 return null;
 }
@@ -138,10 +140,83 @@ return {ok:false,issues};
 return {ok:true,extensionInstanceId,items};
 }
 
+function getJwtSecret(){
+const secret=process.env.EXTENSION_JWT_SECRET;
+if(!secret)throw new Error("EXTENSION_JWT_SECRET is not set");
+return new TextEncoder().encode(secret);
+}
+
+async function generateExtensionJwt(userId,extensionInstanceId){
+return new SignJWT({userId,extensionInstanceId})
+.setProtectedHeader({alg:"HS256"})
+.setIssuedAt()
+.setExpirationTime("30d")
+.sign(getJwtSecret());
+}
+
+export async function verifyExtensionAuthToken(token){
+try{
+const{payload}=await jwtVerify(token,getJwtSecret());
+const userId=typeof payload.userId==="string"?payload.userId:null;
+const extensionInstanceId=typeof payload.extensionInstanceId==="string"?payload.extensionInstanceId:null;
+if(!userId||!extensionInstanceId)return null;
+return{userId,extensionInstanceId};
+}catch{
+return null;
+}
+}
+
+async function authenticateExtensionToken(args){
+const jwtPayload=await verifyExtensionAuthToken(args.extensionAuthToken);
+if(!jwtPayload){
+return {ok:false,status:401,message:"Unauthorized"};
+}
+const extensionInstanceId=args.extensionInstanceId||jwtPayload.extensionInstanceId;
+if(jwtPayload.extensionInstanceId!==extensionInstanceId){
+return {ok:false,status:401,message:"Unauthorized"};
+}
+const linkedExtension=await prisma.linkedExtension.findUnique({where:{extensionInstanceId},select:{id:true,userId:true,extensionInstanceId:true,extensionAuthHash:true,revokedAt:true,user:{select:{id:true,name:true,nickname:true,email:true}}}});
+if(!linkedExtension||linkedExtension.revokedAt){
+return {ok:false,status:401,message:"Unauthorized"};
+}
+if(linkedExtension.userId!==jwtPayload.userId){
+return {ok:false,status:401,message:"Unauthorized"};
+}
+if(!tokenHashMatches(args.extensionAuthToken,linkedExtension.extensionAuthHash)){
+return {ok:false,status:401,message:"Unauthorized"};
+}
+return {ok:true,linkedExtension:{id:linkedExtension.id,userId:linkedExtension.userId,extensionInstanceId:linkedExtension.extensionInstanceId,user:linkedExtension.user}};
+}
+
+export async function authenticateExtensionAuthToken(extensionAuthToken){
+return authenticateExtensionToken({extensionAuthToken});
+}
+
 export async function issueExtensionLinkToken(userId){
+return issueExtensionLinkTokenForUser({userId});
+}
+
+export async function issueExtensionLinkTokenForUser(args){
+let user=null;
+if(args.userId){
+user=await prisma.user.findUnique({where:{id:args.userId},select:{id:true}});
+}
+if(!user&&args.email){
+user=await prisma.user.findUnique({where:{email:args.email},select:{id:true}});
+}
+if(!user){
+return null;
+}
 const linkToken=generateOpaqueToken();
 const expiresAt=new Date(Date.now()+LINK_TOKEN_TTL_MS);
-await prisma.extensionLinkToken.create({data:{userId,tokenHash:hashOpaqueToken(linkToken),expiresAt}});
+try{
+await prisma.extensionLinkToken.create({data:{userId:user.id,tokenHash:hashOpaqueToken(linkToken),expiresAt}});
+}catch(error){
+if(error instanceof Prisma.PrismaClientKnownRequestError&&error.code==="P2003"){
+return null;
+}
+throw error;
+}
 return {linkToken,expiresAt};
 }
 
@@ -163,7 +238,7 @@ const consumed=await tx.extensionLinkToken.updateMany({where:{id:linkTokenRecord
 if(consumed.count!==1){
 return {ok:false,status:409,message:"LinkTokenAlreadyUsed"};
 }
-const extensionAuthToken=generateOpaqueToken();
+const extensionAuthToken=await generateExtensionJwt(linkTokenRecord.userId,args.extensionInstanceId);
 const extensionAuthHash=hashOpaqueToken(extensionAuthToken);
 await tx.linkedExtension.upsert({where:{extensionInstanceId:args.extensionInstanceId},update:{userId:linkTokenRecord.userId,extensionAuthHash,linkedAt:now,lastSeenAt:now,revokedAt:null},create:{userId:linkTokenRecord.userId,extensionInstanceId:args.extensionInstanceId,extensionAuthHash,linkedAt:now,lastSeenAt:now}});
 return {ok:true,extensionAuthToken};
@@ -171,12 +246,5 @@ return {ok:true,extensionAuthToken};
 }
 
 export async function authenticateLinkedExtension(args){
-const linkedExtension=await prisma.linkedExtension.findUnique({where:{extensionInstanceId:args.extensionInstanceId},select:{id:true,userId:true,extensionInstanceId:true,extensionAuthHash:true,revokedAt:true,user:{select:{id:true,name:true,nickname:true,email:true}}}});
-if(!linkedExtension||linkedExtension.revokedAt){
-return {ok:false,status:401,message:"Unauthorized"};
-}
-if(!tokenHashMatches(args.extensionAuthToken,linkedExtension.extensionAuthHash)){
-return {ok:false,status:401,message:"Unauthorized"};
-}
-return {ok:true,linkedExtension:{id:linkedExtension.id,userId:linkedExtension.userId,extensionInstanceId:linkedExtension.extensionInstanceId,user:linkedExtension.user}};
+return authenticateExtensionToken(args);
 }

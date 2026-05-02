@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { buildClipWriteCorsHeaders, isAllowedClipWriteOrigin } from "@/lib/api/cors";
 import { normalizeClipBatchPayload } from "@/lib/clips/contract";
-import { resolveClipWriteOwnerFromSessionUser, writeClipBatch } from "@/lib/clips/service";
+import { resolveClipWriteOwnerFromSessionUser, resolveClipWriteOwnerFromBearerToken, writeClipBatch } from "@/lib/clips/service";
+import { parseBearerToken } from "@/lib/extension/service";
 
 async function handleClipWrite(req){
 const headers=buildClipWriteCorsHeaders(req);
@@ -9,14 +10,21 @@ if(!isAllowedClipWriteOrigin(req)){
 return new Response(JSON.stringify({ message: "Origin not allowed" }),{ status: 403, headers });
 }
 
+let owner=null;
+
+const bearerToken=parseBearerToken(req.headers.get("authorization"));
+if(bearerToken){
+owner=await resolveClipWriteOwnerFromBearerToken(bearerToken);
+}
+
+if(!owner){
 const session=await auth();
-if(!session){
-return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
+if(session?.user?.id){
+owner=await resolveClipWriteOwnerFromSessionUser(session.user);
 }
-if(!session.user){
-return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
 }
-if(!session.user.id){
+
+if(!owner){
 return new Response(JSON.stringify({ message: "Unauthorized" }),{ status: 401, headers });
 }
 
@@ -36,7 +44,6 @@ return new Response(JSON.stringify({ message: "保存完了", savedCount: 0, ite
 }
 
 try{
-const owner=await resolveClipWriteOwnerFromSessionUser(session.user);
 const items=await writeClipBatch(normalized.clips,owner);
 return new Response(JSON.stringify({ message: "保存完了", savedCount: items.length, items, result: items[0]?items[0]:null }),{ status: 200, headers });
 }catch(error){

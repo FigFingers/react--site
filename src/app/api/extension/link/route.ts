@@ -1,5 +1,5 @@
 //@ts-nocheck
-import{buildExtensionCorsHeaders,isAllowedClipWriteOrigin}from"@/lib/api/cors";
+import{buildExtensionCorsHeaders,isAllowedExtensionOrigin}from"@/lib/api/cors";
 import{consumeLinkTokenAndLinkExtension,normalizeExtensionLinkPayload}from"@/lib/extension/service";
 
 function buildHeaders(req){
@@ -11,7 +11,7 @@ return new Response(JSON.stringify(body),{status,headers:buildHeaders(req)});
 }
 
 export async function POST(req){
-if(!isAllowedClipWriteOrigin(req)){
+if(!isAllowedExtensionOrigin(req)){
 return json(req,{message:"OriginNotAllowed"},403);
 }
 let body;
@@ -33,7 +33,7 @@ return json(req,{ok:true,extensionAuthToken:result.extensionAuthToken},200);
 
 export function OPTIONS(req){
 const headers=buildHeaders(req);
-if(!isAllowedClipWriteOrigin(req)){
+if(!isAllowedExtensionOrigin(req)){
 return new Response(null,{status:403,headers});
 }
 return new Response(null,{status:200,headers});

@@ -1,7 +1,7 @@
 //@ts-nocheck
 import{Prisma}from"@prisma/client";
 import{prisma}from"@/lib/prisma";
-import{buildExtensionCorsHeaders,isAllowedClipWriteOrigin}from"@/lib/api/cors";
+import{buildExtensionCorsHeaders,isAllowedExtensionOrigin}from"@/lib/api/cors";
 import{createClipRecord,resolveClipWriteOwnerFromLinkedExtension}from"@/lib/clips/service";
 import{authenticateLinkedExtension,normalizeExtensionSyncPayload,parseBearerToken}from"@/lib/extension/service";
 
@@ -27,7 +27,7 @@ return deduped;
 }
 
 export async function POST(req){
-if(!isAllowedClipWriteOrigin(req)){
+if(!isAllowedExtensionOrigin(req)){
 return json(req,{message:"OriginNotAllowed"},403);
 }
 const extensionAuthToken=parseBearerToken(req.headers.get("authorization"));
@@ -93,7 +93,7 @@ return json(req,{message:"SyncFailed",error:String(error)},500);
 
 export function OPTIONS(req){
 const headers=buildHeaders(req);
-if(!isAllowedClipWriteOrigin(req)){
+if(!isAllowedExtensionOrigin(req)){
 return new Response(null,{status:403,headers});
 }
 return new Response(null,{status:200,headers});

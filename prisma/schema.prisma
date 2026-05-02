@@ -37,28 +37,28 @@ model Playlist {
 }
 
 model PlaylistClip {
-  id         Int      @id @default(autoincrement())
+  id         Int @id @default(autoincrement())
   playlistId Int
   clipId     Int
   order      Int
 
-  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
 
   @@index([playlistId, order])
 }
 
 model User {
-  id            String   @id @default(cuid())
-  email         String   @unique
+  id            String    @id @default(cuid())
+  email         String    @unique
   name          String?
   image         String?
   nickname      String?
-  nicknameNorm  String?  @unique
+  nicknameNorm  String?   @unique
   passwordHash  String?
   emailVerified DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
   accounts      Account[]
   sessions      Session[]
 
@@ -69,34 +69,34 @@ model User {
 }
 
 model LinkedExtension {
-  id                  Int          @id @default(autoincrement())
+  id                  String        @id @default(cuid())
   userId              String
-  extensionInstanceId String       @unique
-  extensionAuthHash   String
-  linkedAt            DateTime     @default(now())
-  lastSeenAt          DateTime     @default(now())
-  revokedAt           DateTime?
-  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  extensionInstanceId String
+  tokenHash           String
+  createdAt           DateTime      @default(now())
+  lastUsedAt          DateTime?
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   syncReceipts        SyncReceipt[]
 
-  @@index([userId, revokedAt])
+  @@unique([extensionInstanceId])
+  @@index([userId])
 }
 
 model ExtensionLinkToken {
-  id        Int      @id @default(autoincrement())
+  id        Int       @id @default(autoincrement())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, expiresAt])
 }
 
 model SyncReceipt {
   id                Int             @id @default(autoincrement())
-  linkedExtensionId Int
+  linkedExtensionId String
   clientItemId      String
   itemType          String
   createdAt         DateTime        @default(now())

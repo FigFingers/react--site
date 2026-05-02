@@ -1,6 +1,7 @@
 //@ts-nocheck
+import{auth}from"@/auth";
 import{buildExtensionCorsHeaders,isAllowedExtensionOrigin}from"@/lib/api/cors";
-import{consumeLinkTokenAndLinkExtension,normalizeExtensionLinkPayload}from"@/lib/extension/service";
+import{linkExtensionInstanceToUser,normalizeExtensionLinkPayload}from"@/lib/extension/service";
 
 function buildHeaders(req){
 return buildExtensionCorsHeaders(req,{methods:["POST","OPTIONS"]});
@@ -11,6 +12,10 @@ return new Response(JSON.stringify(body),{status,headers:buildHeaders(req)});
 }
 
 export async function POST(req){
+const session=await auth();
+if(!session?.user?.id){
+return json(req,{message:"Unauthorized"},401);
+}
 if(!isAllowedExtensionOrigin(req)){
 return json(req,{message:"OriginNotAllowed"},403);
 }
@@ -24,9 +29,9 @@ const normalized=normalizeExtensionLinkPayload(body);
 if(!normalized.ok){
 return json(req,{message:"ValidationFailed",issues:normalized.issues},400);
 }
-const result=await consumeLinkTokenAndLinkExtension(normalized);
-if(!result.ok){
-return json(req,{message:result.message},result.status);
+const result=await linkExtensionInstanceToUser({userId:session.user.id,extensionInstanceId:normalized.extensionInstanceId});
+if(!result){
+return json(req,{message:"Unauthorized"},401);
 }
 return json(req,{ok:true,extensionAuthToken:result.extensionAuthToken},200);
 }

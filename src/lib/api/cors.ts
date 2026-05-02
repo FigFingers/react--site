@@ -2,7 +2,7 @@ const allowedOriginsEnv=process.env.CLIP_API_ALLOWED_ORIGINS?process.env.CLIP_AP
 const CLIP_WRITE_ALLOWED_ORIGINS=[process.env.NEXTAUTH_URL,...allowedOriginsEnv.split(",")];
 const normalizedClipWriteAllowedOrigins=CLIP_WRITE_ALLOWED_ORIGINS.map(function(value){return value?value.trim():value;});
 const CLIP_WRITE_ALLOWED_ORIGINS_NORMALIZED=normalizedClipWriteAllowedOrigins.filter(Boolean);
-const DEFAULT_ALLOWED_HEADERS=["Content-Type","Authorization"];
+const DEFAULT_ALLOWED_HEADERS=["Content-Type","Authorization","X-Extension-Instance-Id"];
 const CHROME_EXTENSION_ORIGIN_PREFIX="chrome-extension://";
 
 function buildCorsHeaders(request,options){

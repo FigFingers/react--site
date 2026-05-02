@@ -27,17 +27,17 @@ function getEmailLocalPart(email) {
 }
 
 function chooseLatestActiveLinkedExtension(linkedExtensions) {
-  const active = linkedExtensions.filter((item) => item.revokedAt === null);
+  const active = [...linkedExtensions];
   active.sort(function compare(a, b) {
-    const aLastSeen = new Date(a.lastSeenAt).getTime();
-    const bLastSeen = new Date(b.lastSeenAt).getTime();
-    if (aLastSeen !== bLastSeen) {
-      return bLastSeen - aLastSeen;
+    const aLastUsed = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0;
+    const bLastUsed = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0;
+    if (aLastUsed !== bLastUsed) {
+      return bLastUsed - aLastUsed;
     }
 
-    const aLinkedAt = new Date(a.linkedAt).getTime();
-    const bLinkedAt = new Date(b.linkedAt).getTime();
-    return bLinkedAt - aLinkedAt;
+    const aCreatedAt = new Date(a.createdAt).getTime();
+    const bCreatedAt = new Date(b.createdAt).getTime();
+    return bCreatedAt - aCreatedAt;
   });
 
   return active[0] ?? null;
@@ -115,9 +115,8 @@ async function main() {
       linkedExtensions: {
         select: {
           extensionInstanceId: true,
-          revokedAt: true,
-          linkedAt: true,
-          lastSeenAt: true,
+          createdAt: true,
+          lastUsedAt: true,
         },
       },
     },

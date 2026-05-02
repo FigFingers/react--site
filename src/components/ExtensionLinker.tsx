@@ -7,6 +7,7 @@ const CHECK_TIMEOUT_MS = 1000;
 type ExtensionAuthStatus = {
   available: boolean;
   loggedIn: boolean;
+  extensionInstanceId: string | null;
 };
 
 function createRequestId() {
@@ -22,7 +23,7 @@ function checkExtensionAuthStatus(): Promise<ExtensionAuthStatus> {
     const requestId = createRequestId();
     const timer = setTimeout(() => {
       window.removeEventListener('message', handler);
-      resolve({ available: false, loggedIn: false });
+      resolve({ available: false, loggedIn: false, extensionInstanceId: null });
     }, CHECK_TIMEOUT_MS);
 
     function handler(event: MessageEvent) {
@@ -35,6 +36,10 @@ function checkExtensionAuthStatus(): Promise<ExtensionAuthStatus> {
         resolve({
           available: true,
           loggedIn: Boolean(event.data.loggedIn),
+          extensionInstanceId:
+            typeof event.data.extensionInstanceId === 'string'
+              ? event.data.extensionInstanceId
+              : null,
         });
       }
     }
@@ -52,12 +57,24 @@ export function ExtensionLinker() {
     async function maybeLink() {
       const status = await checkExtensionAuthStatus();
       if (!status.available || status.loggedIn) return;
+      if (!status.extensionInstanceId) return;
 
-      const res = await fetch('/api/extension/link-token', { method: 'POST' });
+      const res = await fetch('/api/extension/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          extensionInstanceId: status.extensionInstanceId,
+        }),
+      });
       if (!res.ok) return;
-      const { linkToken } = await res.json();
+      const { extensionAuthToken } = await res.json();
       window.postMessage(
-        { type: 'EXT_LINK_WITH_TOKEN', requestId: createRequestId(), linkToken },
+        {
+          type: 'EXT_LINK_WITH_AUTH_TOKEN',
+          requestId: createRequestId(),
+          extensionInstanceId: status.extensionInstanceId,
+          extensionAuthToken,
+        },
         window.location.origin
       );
     }

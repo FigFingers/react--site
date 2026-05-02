@@ -51,6 +51,8 @@ return json(req,{message:authResult.message},authResult.status);
 const owner=resolveClipWriteOwnerFromLinkedExtension(authResult.linkedExtension);
 const dedupedItems=dedupeItems(normalized.items);
 const acceptedItemIds=[];
+const skippedItemIds=[];
+let savedCount=0;
 const now=new Date();
 try{
 await prisma.$transaction(async function(tx){
@@ -64,6 +66,7 @@ receiptIds.add(receipt.clientItemId);
 for(const item of dedupedItems){
 if(receiptIds.has(item.clientItemId)){
 acceptedItemIds.push(item.clientItemId);
+skippedItemIds.push(item.clientItemId);
 continue;
 }
 try{
@@ -73,18 +76,20 @@ if(error instanceof Prisma.PrismaClientKnownRequestError){
 if(error.code==="P2002"){
 receiptIds.add(item.clientItemId);
 acceptedItemIds.push(item.clientItemId);
+skippedItemIds.push(item.clientItemId);
 continue;
 }
 }
 throw error;
 }
-await createClipRecord(tx,{...item.payload,createdAt:item.createdAt},owner);
+await createClipRecord(tx,item.payload,owner);
 receiptIds.add(item.clientItemId);
 acceptedItemIds.push(item.clientItemId);
+savedCount+=1;
 }
-await tx.linkedExtension.update({where:{id:authResult.linkedExtension.id},data:{lastSeenAt:now}});
+await tx.linkedExtension.update({where:{id:authResult.linkedExtension.id},data:{lastUsedAt:now}});
 });
-return json(req,{ok:true,acceptedItemIds},200);
+return json(req,{ok:true,savedCount,acceptedItemIds,skippedItemIds},200);
 }catch(error){
 console.error("POST/api/extension/sync",error);
 return json(req,{message:"SyncFailed",error:String(error)},500);

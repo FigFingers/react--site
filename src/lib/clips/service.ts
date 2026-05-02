@@ -3,7 +3,6 @@ import { prisma } from "@/lib/prisma";
 import type { CanonicalClipInput } from "@/lib/clips/contract";
 import type { ClipUserInfo } from "@/lib/clips/user";
 import { resolveCurrentUserDisplayName } from "@/lib/users/displayName";
-import { authenticateExtensionAuthToken } from "@/lib/extension/service";
 
 type ClipDbClient = typeof prisma | Prisma.TransactionClient;
 
@@ -77,11 +76,10 @@ async function findActiveLinkedExtensionForUser(
   return db.linkedExtension.findFirst({
     where: {
       userId,
-      revokedAt: null,
     },
     orderBy: [
-      { lastSeenAt: "desc" },
-      { linkedAt: "desc" },
+      { lastUsedAt: "desc" },
+      { createdAt: "desc" },
       { id: "desc" },
     ],
     select: {
@@ -114,19 +112,6 @@ export async function resolveClipWriteOwnerFromSessionUser(
     userId: user.id,
     displayName: resolveClipOwnerDisplayName(dbUser ?? user),
     extensionInstanceId: linkedExtension?.extensionInstanceId ?? null,
-  });
-}
-
-export async function resolveClipWriteOwnerFromBearerToken(token: string) {
-  const authResult = await authenticateExtensionAuthToken(token);
-  if (!authResult.ok) return null;
-
-  const linkedExtension = authResult.linkedExtension;
-
-  return buildClipWriteOwner({
-    userId: linkedExtension.userId,
-    displayName: resolveClipOwnerDisplayName(linkedExtension.user),
-    extensionInstanceId: linkedExtension.extensionInstanceId,
   });
 }
 

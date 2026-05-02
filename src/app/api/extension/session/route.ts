@@ -18,7 +18,8 @@ const token=parseBearerToken(req.headers.get("authorization"));
 if(!token){
 return json(req,{message:"Unauthorized"},401);
 }
-const result=await authenticateExtensionAuthToken(token);
+const extensionInstanceId=req.headers.get("x-extension-instance-id");
+const result=await authenticateExtensionAuthToken(token,extensionInstanceId);
 if(!result.ok){
 return json(req,{message:"Unauthorized"},401);
 }

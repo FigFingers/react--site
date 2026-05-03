@@ -65,7 +65,6 @@ model User {
   clips               Clip[]
   playlists           Playlist[]
   linkedExtensions    LinkedExtension[]
-  extensionLinkTokens ExtensionLinkToken[]
 }
 
 model LinkedExtension {
@@ -80,18 +79,6 @@ model LinkedExtension {
 
   @@unique([extensionInstanceId])
   @@index([userId])
-}
-
-model ExtensionLinkToken {
-  id        Int       @id @default(autoincrement())
-  userId    String
-  tokenHash String    @unique
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, expiresAt])
 }
 
 model SyncReceipt {

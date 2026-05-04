@@ -8,22 +8,24 @@ datasource db {
 }
 
 model Clip {
-  id            Int            @id @default(autoincrement())
-  clipName      String?
-  user          String
-  userInfo      Json?
-  userId        String?
-  service       String
-  startTime     Float
-  endTime       Float
-  url           String
-  title         String
-  epnumber      String?
-  createdAt     DateTime       @default(now())
-  playlistClips PlaylistClip[]
-  owner         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
+  id                  Int            @id @default(autoincrement())
+  clipName            String?
+  user                String
+  userInfo            Json?
+  userId              String?
+  service             String
+  startTime           Float
+  endTime             Float
+  url                 String
+  title               String
+  epnumber            String?
+  extensionInstanceId String?
+  createdAt           DateTime       @default(now())
+  playlistClips       PlaylistClip[]
+  owner               User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([userId])
+  @@index([extensionInstanceId])
 }
 
 model Playlist {
@@ -62,35 +64,22 @@ model User {
   accounts      Account[]
   sessions      Session[]
 
-  clips               Clip[]
-  playlists           Playlist[]
-  linkedExtensions    LinkedExtension[]
+  clips            Clip[]
+  playlists        Playlist[]
+  linkedExtensions LinkedExtension[]
 }
 
 model LinkedExtension {
-  id                  String        @id @default(cuid())
+  id                  String    @id @default(cuid())
   userId              String
   extensionInstanceId String
-  tokenHash           String
-  createdAt           DateTime      @default(now())
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @default(now()) @updatedAt
   lastUsedAt          DateTime?
-  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  syncReceipts        SyncReceipt[]
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([extensionInstanceId])
   @@index([userId])
-}
-
-model SyncReceipt {
-  id                Int             @id @default(autoincrement())
-  linkedExtensionId String
-  clientItemId      String
-  itemType          String
-  createdAt         DateTime        @default(now())
-  linkedExtension   LinkedExtension @relation(fields: [linkedExtensionId], references: [id], onDelete: Cascade)
-
-  @@unique([linkedExtensionId, clientItemId])
-  @@index([linkedExtensionId, createdAt])
 }
 
 model Account {

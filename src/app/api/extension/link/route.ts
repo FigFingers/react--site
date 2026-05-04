@@ -30,10 +30,10 @@ if(!normalized.ok){
 return json(req,{message:"ValidationFailed",issues:normalized.issues},400);
 }
 const result=await linkExtensionInstanceToUser({userId:session.user.id,extensionInstanceId:normalized.extensionInstanceId});
-if(!result){
-return json(req,{message:"Unauthorized"},401);
+if(!result.ok){
+return json(req,{message:result.message},result.status);
 }
-return json(req,{ok:true,extensionAuthToken:result.extensionAuthToken},200);
+return json(req,{ok:true,extensionInstanceId:result.extensionInstanceId,userId:result.userId},200);
 }
 
 export function OPTIONS(req){

@@ -22,6 +22,7 @@ type LinkedExtensionOwner = {
 type ClipWriteOwner = {
   userId: string;
   ownerName: string;
+  extensionInstanceId: string | null;
   userInfo: ClipUserInfo | null;
 };
 
@@ -65,6 +66,7 @@ function buildClipWriteOwner(args: {
   return {
     userId: args.userId,
     ownerName: args.displayName ?? args.userId,
+    extensionInstanceId: args.extensionInstanceId ?? null,
     userInfo: buildClipUserInfo(args),
   };
 }
@@ -133,6 +135,7 @@ function buildClipCreateData(
     clipName: clip.clipName ?? undefined,
     user: owner.ownerName,
     userId: owner.userId,
+    extensionInstanceId: owner.extensionInstanceId ?? undefined,
     userInfo: owner.userInfo ? toPrismaClipUserInfo(owner.userInfo) : undefined,
     service: clip.service,
     startTime: clip.startTime,

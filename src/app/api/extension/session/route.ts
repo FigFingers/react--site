@@ -1,6 +1,6 @@
 //@ts-nocheck
 import{buildExtensionCorsHeaders,isAllowedExtensionOrigin}from"@/lib/api/cors";
-import{authenticateExtensionAuthToken,parseBearerToken}from"@/lib/extension/service";
+import{resolveLinkedExtension}from"@/lib/extension/service";
 
 function buildHeaders(req){
 return buildExtensionCorsHeaders(req,{methods:["GET","OPTIONS"]});
@@ -14,12 +14,7 @@ export async function GET(req){
 if(!isAllowedExtensionOrigin(req)){
 return json(req,{message:"OriginNotAllowed"},403);
 }
-const token=parseBearerToken(req.headers.get("authorization"));
-if(!token){
-return json(req,{message:"Unauthorized"},401);
-}
-const extensionInstanceId=req.headers.get("x-extension-instance-id");
-const result=await authenticateExtensionAuthToken(token,extensionInstanceId);
+const result=await resolveLinkedExtension(req.headers.get("x-extension-instance-id"));
 if(!result.ok){
 return json(req,{message:"Unauthorized"},401);
 }

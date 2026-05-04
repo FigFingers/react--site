@@ -1,11 +1,5 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import {
-  type CanonicalClipInput,
-  normalizeClipBatchPayload,
-} from "@/lib/clips/contract";
 
-const EXTENSION_AUTH_TOKEN_BYTES = 32;
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -15,22 +9,17 @@ type ValidationIssue = {
   message: string;
 };
 
-type LinkedExtensionAuthResult =
+type LinkedExtensionLinkResult =
   | {
       ok: true;
-      linkedExtension: {
-        id: string;
-        userId: string;
-        extensionInstanceId: string;
-        user: {
-          id: string;
-          name: string | null;
-          nickname: string | null;
-          email: string | null;
-        } | null;
-      };
+      userId: string;
+      extensionInstanceId: string;
     }
-  | { ok: false; status: 401; message: "Unauthorized" };
+  | {
+      ok: false;
+      status: 401 | 409;
+      message: "Unauthorized" | "ExtensionAlreadyLinkedToAnotherUser";
+    };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -67,38 +56,6 @@ function normalizeUuid(
   return text;
 }
 
-function tokenHashMatches(token: string, expectedHash: string) {
-  const actualHash = hashExtensionAuthToken(token);
-  if (actualHash.length !== expectedHash.length) return false;
-
-  try {
-    return timingSafeEqual(
-      Buffer.from(actualHash, "hex"),
-      Buffer.from(expectedHash, "hex")
-    );
-  } catch {
-    return false;
-  }
-}
-
-export function generateExtensionAuthToken() {
-  return randomBytes(EXTENSION_AUTH_TOKEN_BYTES).toString("base64url");
-}
-
-export function hashExtensionAuthToken(token: string) {
-  return createHash("sha256").update(token, "utf8").digest("hex");
-}
-
-export function parseBearerToken(authorizationHeader: string | null) {
-  if (!authorizationHeader) return null;
-
-  const match = authorizationHeader.trim().match(/^Bearer\s+(.+)$/i);
-  if (!match) return null;
-
-  const token = match[1].trim();
-  return token || null;
-}
-
 export function normalizeExtensionLinkPayload(body: unknown) {
   if (!isRecord(body)) {
     return {
@@ -106,10 +63,13 @@ export function normalizeExtensionLinkPayload(body: unknown) {
       issues: [{ index: -1, field: "body", message: "bodyMustBeObject" }],
     };
   }
+  return normalizeExtensionInstanceId(body.extensionInstanceId);
+}
 
+export function normalizeExtensionInstanceId(value: unknown) {
   const issues: ValidationIssue[] = [];
   const extensionInstanceId = normalizeUuid(
-    body.extensionInstanceId,
+    value,
     -1,
     "extensionInstanceId",
     issues
@@ -122,85 +82,6 @@ export function normalizeExtensionLinkPayload(body: unknown) {
   return { ok: true as const, extensionInstanceId };
 }
 
-export function normalizeExtensionSyncPayload(body: unknown) {
-  if (!isRecord(body)) {
-    return {
-      ok: false as const,
-      issues: [{ index: -1, field: "body", message: "bodyMustBeObject" }],
-    };
-  }
-
-  const issues: ValidationIssue[] = [];
-  const extensionInstanceId = normalizeUuid(
-    body.extensionInstanceId,
-    -1,
-    "extensionInstanceId",
-    issues
-  );
-
-  if (!Array.isArray(body.clips)) {
-    issues.push({ index: -1, field: "clips", message: "clipsMustBeArray" });
-  }
-
-  const items: Array<{
-    clientItemId: string;
-    type: "clip";
-    payload: CanonicalClipInput;
-  }> = [];
-
-  if (Array.isArray(body.clips)) {
-    for (let index = 0; index < body.clips.length; index += 1) {
-      const rawClip = body.clips[index];
-      if (!isRecord(rawClip)) {
-        issues.push({ index, field: "clips", message: "clipMustBeObject" });
-        continue;
-      }
-
-      const clientItemId = normalizeRequiredString(
-        rawClip.clientItemId,
-        index,
-        "clientItemId",
-        issues
-      );
-      const normalizedPayload = normalizeClipBatchPayload(rawClip);
-
-      if (normalizedPayload.ok === false) {
-        for (const issue of normalizedPayload.issues) {
-          issues.push({
-            index,
-            field: issue.field,
-            message: issue.message,
-          });
-        }
-        continue;
-      }
-
-      if (normalizedPayload.clips.length !== 1) {
-        issues.push({
-          index,
-          field: "clip",
-          message: "clipMustContainExactlyOneClip",
-        });
-        continue;
-      }
-
-      if (clientItemId) {
-        items.push({
-          clientItemId,
-          type: "clip",
-          payload: normalizedPayload.clips[0],
-        });
-      }
-    }
-  }
-
-  if (issues.length > 0 || !extensionInstanceId) {
-    return { ok: false as const, issues };
-  }
-
-  return { ok: true as const, extensionInstanceId, items };
-}
-
 async function ensureUserExists(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
@@ -211,45 +92,73 @@ async function ensureUserExists(userId: string) {
 export async function linkExtensionInstanceToUser(args: {
   userId: string;
   extensionInstanceId: string;
-}) {
+}): Promise<LinkedExtensionLinkResult> {
   const user = await ensureUserExists(args.userId);
-  if (!user) return null;
-
-  const extensionAuthToken = generateExtensionAuthToken();
-  const tokenHash = hashExtensionAuthToken(extensionAuthToken);
-
-  await prisma.linkedExtension.upsert({
-    where: { extensionInstanceId: args.extensionInstanceId },
-    update: {
-      userId: user.id,
-      tokenHash,
-      lastUsedAt: null,
-    },
-    create: {
-      userId: user.id,
-      extensionInstanceId: args.extensionInstanceId,
-      tokenHash,
-    },
-  });
-
-  return { extensionAuthToken };
-}
-
-export async function authenticateLinkedExtension(args: {
-  extensionInstanceId: string;
-  extensionAuthToken: string;
-}): Promise<LinkedExtensionAuthResult> {
-  if (!UUID_PATTERN.test(args.extensionInstanceId) || !args.extensionAuthToken) {
+  if (!user) {
     return { ok: false, status: 401, message: "Unauthorized" };
   }
 
-  const linkedExtension = await prisma.linkedExtension.findUnique({
+  const existing = await prisma.linkedExtension.findUnique({
     where: { extensionInstanceId: args.extensionInstanceId },
+    select: { id: true, userId: true },
+  });
+
+  if (existing && existing.userId !== user.id) {
+    return {
+      ok: false,
+      status: 409,
+      message: "ExtensionAlreadyLinkedToAnotherUser",
+    };
+  }
+
+  const linkedExtension = existing
+    ? await prisma.linkedExtension.update({
+        where: { id: existing.id },
+        data: { lastUsedAt: null },
+        select: { userId: true, extensionInstanceId: true },
+      })
+    : await prisma.linkedExtension.create({
+        data: {
+          userId: user.id,
+          extensionInstanceId: args.extensionInstanceId,
+        },
+        select: { userId: true, extensionInstanceId: true },
+      });
+
+  return {
+    ok: true,
+    userId: linkedExtension.userId,
+    extensionInstanceId: linkedExtension.extensionInstanceId,
+  };
+}
+
+export async function resolveLinkedExtension(extensionInstanceId: unknown) {
+  const normalized = normalizeExtensionInstanceId(extensionInstanceId);
+  if (!normalized.ok) {
+    return { ok: false as const, status: 400 as const, issues: normalized.issues };
+  }
+
+  const linkedExtension = await findLinkedExtensionByInstanceId(normalized.extensionInstanceId);
+  if (!linkedExtension) {
+    return { ok: false as const, status: 401 as const, message: "ExtensionNotLinked" as const };
+  }
+
+  return { ok: true as const, linkedExtension };
+}
+
+export async function findLinkedExtensionByInstanceId(
+  extensionInstanceId: string
+) {
+  if (!UUID_PATTERN.test(extensionInstanceId)) {
+    return null;
+  }
+
+  return prisma.linkedExtension.findUnique({
+    where: { extensionInstanceId },
     select: {
       id: true,
       userId: true,
       extensionInstanceId: true,
-      tokenHash: true,
       user: {
         select: {
           id: true,
@@ -260,34 +169,4 @@ export async function authenticateLinkedExtension(args: {
       },
     },
   });
-
-  if (!linkedExtension) {
-    return { ok: false, status: 401, message: "Unauthorized" };
-  }
-
-  if (!tokenHashMatches(args.extensionAuthToken, linkedExtension.tokenHash)) {
-    return { ok: false, status: 401, message: "Unauthorized" };
-  }
-
-  return {
-    ok: true,
-    linkedExtension: {
-      id: linkedExtension.id,
-      userId: linkedExtension.userId,
-      extensionInstanceId: linkedExtension.extensionInstanceId,
-      user: linkedExtension.user,
-    },
-  };
 }
-
-export async function authenticateExtensionAuthToken(
-  extensionAuthToken: string,
-  extensionInstanceId?: string | null
-) {
-  if (!extensionInstanceId) {
-    return { ok: false as const, status: 401 as const, message: "Unauthorized" };
-  }
-
-  return authenticateLinkedExtension({ extensionInstanceId, extensionAuthToken });
-}
-

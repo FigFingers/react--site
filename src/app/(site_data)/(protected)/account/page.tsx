@@ -8,6 +8,7 @@ import {
   formatSubscriptionLabel,
 } from "./accountViewModel.mjs";
 import NicknameForm from "./NicknameForm";
+import { ExtensionLinkButton } from "@/components/ExtensionLinkButton";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,11 @@ export default async function AccountPage() {
             </tr>
           </tbody>
         </table>
+      </section>
+
+      <section className="settings">
+        <h3>Chrome拡張機能</h3>
+        <ExtensionLinkButton />
       </section>
     </main>
   );

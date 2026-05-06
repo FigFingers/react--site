@@ -2,6 +2,7 @@
 import{auth}from"@/auth";
 import{buildExtensionCorsHeaders,isAllowedExtensionOrigin}from"@/lib/api/cors";
 import{linkExtensionInstanceToUser,normalizeExtensionLinkPayload}from"@/lib/extension/service";
+import{signExtensionToken}from"@/lib/extension/jwt";
 
 function buildHeaders(req){
 return buildExtensionCorsHeaders(req,{methods:["POST","OPTIONS"]});
@@ -33,7 +34,8 @@ const result=await linkExtensionInstanceToUser({userId:session.user.id,extension
 if(!result.ok){
 return json(req,{message:result.message},result.status);
 }
-return json(req,{ok:true,extensionInstanceId:result.extensionInstanceId,userId:result.userId},200);
+const token=await signExtensionToken({extensionInstanceId:result.extensionInstanceId,userId:result.userId});
+return json(req,{ok:true,token},200);
 }
 
 export function OPTIONS(req){

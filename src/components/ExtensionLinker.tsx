@@ -67,13 +67,13 @@ export function ExtensionLinker() {
         }),
       });
       if (!res.ok) return;
-      const { extensionAuthToken } = await res.json();
+      const { token } = await res.json();
       window.postMessage(
         {
           type: 'EXT_LINK_WITH_AUTH_TOKEN',
           requestId: createRequestId(),
           extensionInstanceId: status.extensionInstanceId,
-          extensionAuthToken,
+          token,
         },
         window.location.origin
       );

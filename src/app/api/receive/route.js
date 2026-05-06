@@ -5,7 +5,8 @@ import {
   writeClipBatch,
 } from "@/lib/clips/service";
 import { prisma } from "@/lib/prisma";
-import { resolveLinkedExtension } from "@/lib/extension/service";
+import { findLinkedExtensionByInstanceId } from "@/lib/extension/service";
+import { verifyExtensionToken } from "@/lib/extension/jwt";
 
 function json(body, status, headers) {
   return new Response(JSON.stringify(body), { status, headers });
@@ -25,14 +26,10 @@ async function handleClipWrite(req) {
     return json({ message: "InvalidJson", error: String(error) }, 400, headers);
   }
 
-  const linkedExtensionResult = await resolveLinkedExtension(
-    typeof body === "object" && body !== null ? body.extensionInstanceId : undefined
-  );
-  if (!linkedExtensionResult.ok) {
-    const body400 = linkedExtensionResult.issues
-      ? { message: "ValidationFailed", issues: linkedExtensionResult.issues }
-      : { message: linkedExtensionResult.message };
-    return json(body400, linkedExtensionResult.status, headers);
+  const tokenValue = typeof body === "object" && body !== null ? body.token : undefined;
+  const payload = await verifyExtensionToken(tokenValue);
+  if (!payload) {
+    return json({ message: "InvalidToken" }, 401, headers);
   }
 
   const normalized = normalizeClipBatchPayload(body);
@@ -52,14 +49,17 @@ async function handleClipWrite(req) {
     );
   }
 
-  const owner = resolveClipWriteOwnerFromLinkedExtension(
-    linkedExtensionResult.linkedExtension
-  );
+  const linkedExtension = await findLinkedExtensionByInstanceId(payload.extensionInstanceId);
+  if (!linkedExtension) {
+    return json({ message: "ExtensionNotLinked" }, 401, headers);
+  }
+
+  const owner = resolveClipWriteOwnerFromLinkedExtension(linkedExtension);
 
   try {
     const items = await writeClipBatch(normalized.clips, owner);
     await prisma.linkedExtension.update({
-      where: { id: linkedExtensionResult.linkedExtension.id },
+      where: { id: linkedExtension.id },
       data: { lastUsedAt: new Date() },
     });
 

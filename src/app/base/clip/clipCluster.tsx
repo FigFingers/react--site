@@ -5,8 +5,25 @@ import Clip from "@/app/base/clip/clipData";
 
 const DISPLAY_SIZE = 10;
 
-export default function ClipList({ clipApiUrl, userId }) {
-  const [cache, setCache] = useState([]);
+type ClipItem = {
+  id: number;
+  clipName: string | null;
+  title: string;
+  epnumber: string | null;
+  url: string;
+  user: string;
+  service: string;
+  startTime: number;
+  endTime: number;
+};
+
+type Props = {
+  clipApiUrl: string;
+  userId: string;
+};
+
+export default function ClipList({ clipApiUrl, userId }: Props) {
+  const [cache, setCache] = useState<ClipItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [loading, setLoading] = useState(true);

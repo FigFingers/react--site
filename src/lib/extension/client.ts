@@ -50,5 +50,5 @@ export async function linkExtensionToCurrentUser() {
     throw new Error(body.message || "Failed to link extension");
   }
 
-  return body as { ok: true; extensionInstanceId: string; userId: string };
+  return body as { ok: true; token: string };
 }

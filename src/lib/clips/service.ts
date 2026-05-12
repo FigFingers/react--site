@@ -166,13 +166,7 @@ export async function createClipRecords(
   clips: PersistableClipInput[],
   owner: ClipWriteOwner
 ) {
-  const items = [];
-
-  for (const clip of clips) {
-    items.push(await createClipRecord(db, clip, owner));
-  }
-
-  return items;
+  return Promise.all(clips.map((clip) => createClipRecord(db, clip, owner)));
 }
 
 export async function writeClipBatch(

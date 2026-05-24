@@ -8,6 +8,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const cursorParam = searchParams.get("cursor");
+    const serviceParam = searchParams.get("service");
 
     // id は number 型なので変換
     const cursor = cursorParam ? Number(cursorParam) : null;
@@ -20,6 +21,7 @@ export async function GET(req: NextRequest) {
             cursor: { id: cursor }, // number 型であることが重要
           }
         : {}),
+      ...(serviceParam ? { where: { service: serviceParam } } : {}),
       orderBy: { createdAt: 'desc' },
       include: {
         owner: {

@@ -23,14 +23,27 @@ type Props = {
 };
 
 export default function ClipList({ clipApiUrl, userId }: Props) {
+  const [services, setServices] = useState<string[]>([]);
+  const [selectedService, setSelectedService] = useState<string | null>(null);
   const [cache, setCache] = useState<ClipItem[]>([]);
   const [cursor, setCursor] = useState<number | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // StrictMode 対策：同じ clipApiUrl での二重フェッチを防ぐフラグ
   const didFetchRef = useRef<string | null>(null);
+
+  const effectiveUrl = selectedService
+    ? `${clipApiUrl}${clipApiUrl.includes("?") ? "&" : "?"}service=${encodeURIComponent(selectedService)}`
+    : clipApiUrl;
+
+  // サービス一覧を初回のみ取得
+  useEffect(() => {
+    fetch("/api/clips/services")
+      .then((r) => r.json())
+      .then((data) => setServices(data.services ?? []))
+      .catch(() => {});
+  }, []);
 
   // =========================
   // Chunk Fetch
@@ -39,11 +52,11 @@ export default function ClipList({ clipApiUrl, userId }: Props) {
     try {
       setLoading(true);
 
-      const hasQuery = clipApiUrl.includes("?");
+      const hasQuery = effectiveUrl.includes("?");
 
       const url = cursorValue !== null
-        ? `${clipApiUrl}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
-        : clipApiUrl;
+        ? `${effectiveUrl}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
+        : effectiveUrl;
 
       console.log("[ClipList] FETCH URL:", url);
 
@@ -67,24 +80,22 @@ export default function ClipList({ clipApiUrl, userId }: Props) {
   };
 
   // =========================
-  // 初回ロード & クエリ変更時のリセット
+  // 初回ロード・タブ切替・クエリ変更時のリセット
   // =========================
   useEffect(() => {
-    // clipApiUrl が変わったら state をリセット
     setCache([]);
     setCursor(null);
     setVisibleIndex(0);
     setError(null);
     setLoading(true);
 
-    // StrictMode 対策：同じ URL で2回呼ばない
-    if (didFetchRef.current === clipApiUrl) {
+    if (didFetchRef.current === effectiveUrl) {
       return;
     }
-    didFetchRef.current = clipApiUrl;
+    didFetchRef.current = effectiveUrl;
 
     fetchChunk(null);
-  }, [clipApiUrl]);
+  }, [effectiveUrl]);
 
   // =========================
   // Navigation
@@ -130,6 +141,36 @@ export default function ClipList({ clipApiUrl, userId }: Props) {
 
   return (
     <>
+      {services.length > 0 && (
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => setSelectedService(null)}
+            className={`px-4 py-2 rounded transition ${
+              selectedService === null
+                ? "bg-white text-gray-900 font-semibold"
+                : "bg-gray-700 text-white hover:bg-gray-600"
+            }`}
+          >
+            全て
+          </button>
+          {services.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSelectedService(s)}
+              className={`px-4 py-2 rounded transition ${
+                selectedService === s
+                  ? "bg-white text-gray-900 font-semibold"
+                  : "bg-gray-700 text-white hover:bg-gray-600"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
+
       <section className="content-list">
         {visibleItems.length > 0 ? (
           visibleItems.map((item, index) => (

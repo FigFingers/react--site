@@ -83,9 +83,11 @@ export async function requireUser<T extends UserSafeSelect>(
 }
 
 //    単にuser.idのみが欲しい場合
-export async function requireUserId() {
+export async function requireUserId(): Promise<UserId> {
   const { id } = await requireUser({ id: true });
-  return id;
+  const userId = parseSessionUserId(id);
+  if (userId == null) throw new UnauthorizedError();
+  return userId;
 }
 
 //    - パスワード比較/変更など、hashedPassword が本当に必要なとき専用
@@ -102,6 +104,10 @@ export function getUserWithPassword(userId: UserId) {
 }
 
 function parseSessionUserId(value: unknown): UserId | null {
+  if (typeof value === "bigint") {
+    return value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  }
+
   if (typeof value === "number") {
     return Number.isSafeInteger(value) ? value : null;
   }

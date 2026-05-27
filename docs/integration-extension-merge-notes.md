@@ -21,8 +21,8 @@ Included:
 
 ## Remaining Work Before `develop`
 
-1. Run end-to-end extension API verification against a signed-in browser session.
-2. Optionally reintroduce selected features from `origin/AuthForExtension-draft`.
+1. Decide whether selected non-extension features from `origin/AuthForExtension-draft` belong in this merge.
+2. Run a final merge/conflict check against `develop`.
 
 ## Verification Status
 
@@ -32,12 +32,9 @@ Completed against the local Next.js dev server:
 - `POST /api/extension/link-token` returns `401` when unauthenticated
 - `POST /api/extension/link` returns `400` for an invalid body
 - `POST /api/extension/sync` returns `401` when unauthenticated
-
-Still pending:
-
-- link-token issuance from a signed-in browser session
-- successful `link` flow with a real extension instance id
-- successful `sync` flow with authenticated extension traffic
+- signed-in browser flow succeeds for `link-token -> link -> sync`
+- repeated `sync` with the same `clientItemId` returns `200` and is idempotent
+- `npx tsc --noEmit --pretty false` passes after normalizing authenticated user ids at the API boundary
 
 ## Classification Of Remaining Draft Differences
 
@@ -47,6 +44,8 @@ Still pending:
   This is useful, but it needs a fresh schema/service design because the current `User` model does not yet contain `nickname` fields.
 - search improvements
   The scoring idea is reusable, but the draft implementation depends on the old clip schema and old route layout.
+- playlist detail UI
+  The draft contains UI work that may still be useful, but it should be handled as a separate frontend task because the current branch already has the redesigned v1 playlist API.
 
 ### Not adopted
 
@@ -54,6 +53,8 @@ Still pending:
 - old `/api/playlists/*`, `/api/search/*`, `/api/clips/*` route family
 - old `src/lib/*` service layer that bypasses `src/server`
 - SQLite/dev.db based artifacts
+- JWT/UUID-only extension auth rewrites from the draft
+  The current branch uses link tokens plus per-extension bearer tokens with `sync_receipts`, and this has been verified end-to-end.
 
 ### Already integrated conceptually
 

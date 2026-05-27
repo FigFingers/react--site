@@ -34,7 +34,9 @@ export async function updatePlaylist(
   data: Parameters<typeof repo.update>[1],
 ) {
   const playlist = await getPlaylist(id);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   return repo.update(id, data);
 }
 
@@ -44,7 +46,9 @@ export async function deletePlaylist(
   hard = false,
 ) {
   const playlist = await getPlaylist(id);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   return hard ? repo.hardDelete(id) : repo.softDelete(id);
 }
 
@@ -54,7 +58,9 @@ export async function addClipToPlaylist(
   clipId: number,
 ) {
   const playlist = await getPlaylist(playlistId);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   const result = await repo.addClipIfActive(playlistId, clipId);
   if (!result.active_exists) throw new NotFoundError("Clip not found");
 }
@@ -65,7 +71,9 @@ export async function removeClipFromPlaylist(
   clipId: number,
 ) {
   const playlist = await getPlaylist(playlistId);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   return repo.removeClip(playlistId, clipId);
 }
 
@@ -90,7 +98,9 @@ export async function addVodToPlaylist(
   vodId: number,
 ) {
   const playlist = await getPlaylist(playlistId);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   const result = await repo.addVodIfActive(playlistId, vodId);
   if (!result.active_exists) throw new NotFoundError("VOD not found");
   if (!result.inserted) throw new ConflictError("VOD already attached");
@@ -102,7 +112,9 @@ export async function removeVodFromPlaylist(
   vodId: number,
 ) {
   const playlist = await getPlaylist(playlistId);
-  if (playlist.userId !== currentUserId) throw new ForbiddenError();
+  if (String(playlist.userId) !== String(currentUserId)) {
+    throw new ForbiddenError();
+  }
   return repo.removeVod(playlistId, vodId);
 }
 

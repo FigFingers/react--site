@@ -1,16 +1,11 @@
 "use client";
-import '@/app/globals.css';
-import ClipList from '@/app/base/clip/clipCluster';
-import PlayList from '@/app/base/playlist/playlist';
+import "@/app/globals.css";
+import PlayList from "@/app/base/playlist/playlist";
 
 export default function app() {
   return (
-<>
-
-<div className="main-content">
-
-  <PlayList PlayList_Data_Url="/api/playlists/me"/>
-</div>
-</>
-);
+    <div className="main-content">
+      <PlayList PlayList_Data_Url="/api/playlists/me" />
+    </div>
+  );
 }

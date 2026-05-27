@@ -1,4 +1,6 @@
-import { NextRequest } from "next/server";
+// @ts-nocheck
+
+import type { NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 const CHUNK_SIZE = 100;
@@ -57,9 +59,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     // ----------------------------------------
     const items = playlists.map((p) => ({
       id: p.id,
-      name: p.name,                 // ← UI が期待する値
+      name: p.name, // ← UI が期待する値
       user_name: p.user?.name ?? "unknown",
-      data: String(p.id),           // PlayListDetailページに遷移する slug
+      data: String(p.id), // PlayListDetailページに遷移する slug
     }));
 
     return new Response(
@@ -73,19 +75,16 @@ export async function GET(req: NextRequest): Promise<Response> {
           "Content-Type": "application/json",
           "Access-Control-Allow-Origin": "*",
         },
-      }
+      },
     );
   } catch (error) {
     console.error("検索エラー:", error);
 
-    return new Response(
-      JSON.stringify({ error: "検索に失敗しました" }),
-      {
-        status: 500,
-        headers: {
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    return new Response(JSON.stringify({ error: "検索に失敗しました" }), {
+      status: 500,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
   }
 }

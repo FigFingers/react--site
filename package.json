@@ -2,11 +2,18 @@
   "name": "my-app2",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=24.0.0 <25"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "db:seed": "tsx prisma/seed.ts",
+    "lint": "biome check .",
+    "lint:fix": "biome check --apply .",
+    "format": "biome format --write .",
+    "prepare": "husky"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",
@@ -15,24 +22,49 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "@mui/icons-material": "^6.2.0",
-    "@mui/material": "^6.2.0",
-    "@prisma/client": "^6.14.0",
-    "cors": "^2.8.5",
-    "express": "^4.21.2",
-    "next": "^15.1.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^7.3.7",
+    "@mui/material": "^7.3.7",
+    "@prisma/adapter-pg": "^7.4.0",
+    "@prisma/client": "^7.4.0",
+    "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.29",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "swr": "^2.3.6",
-    "zod": "^4.1.12"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@types/node": "^24.3.0",
-    "@types/react": "^19.1.10",
-    "@types/react-dom": "^19.1.7",
-    "prisma": "^6.14.0",
-    "typescript": "^5.9.2"
+    "@biomejs/biome": "^2.3.14",
+    "@lavamoat/allow-scripts": "^3.4.3",
+    "@lavamoat/preinstall-always-fail": "^2.1.1",
+    "@prisma/generator-helper": "^7.4.0",
+    "@prisma/internals": "^7.4.0",
+    "@types/node": "^24.10.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
+    "prisma": "^7.4.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "biome format --write --no-errors-on-unmatched",
+      "biome check"
+    ],
+    "*.{json,md,css,scss}": [
+      "biome format --write --no-errors-on-unmatched"
+    ]
+  },
+  "lavamoat": {
+    "allowScripts": {
+      "@lavamoat/preinstall-always-fail": false,
+      "next>sharp": false,
+      "prisma": false,
+      "prisma>@prisma/engines": false,
+      "tsx>esbuild": false
+    }
   }
 }

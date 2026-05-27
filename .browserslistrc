@@ -1,0 +1,18 @@
+# ES2022 をネイティブ対応させるため Safari/iOS は 16.4+ 固定
+# Netflix/Prime/Disney+ の下限も満たす
+[production]
+Chrome >= 116   # Netflix下限が高い
+Edge >= 118     # 同上
+Firefox >= 111  # 同上
+Safari >= 16.4  # ES2022のstatic{}でSafariは16.4以上必須
+iOS >= 16.4     # 同上
+Opera >= 92     # Netflix下限
+Samsung >= 17   # ES2022のstatic{}の下限
+and_chr >= 116  # Android ChromeはES2022は94でOKだが、Netflix基準に合わせて116
+not dead
+not op_mini all
+
+[development]
+last 1 chrome version
+last 1 firefox version
+last 1 safari version

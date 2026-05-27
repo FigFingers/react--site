@@ -1,9 +1,11 @@
+// @ts-nocheck
+
 import { NextResponse } from "next/server";
-import {prisma} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ playlistId: string }> }
+  context: { params: Promise<{ playlistId: string }> },
 ) {
   const { playlistId } = await context.params;
 

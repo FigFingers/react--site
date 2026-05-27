@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# FigFingers React Site
 
-## Getting Started
+Next.js App Router application for FigFingers. The current branch uses a Prisma/PostgreSQL backend with:
 
-First, run the development server:
+- NextAuth v5
+- Prisma 7
+- `src/server` service/repository layering
+- `prisma-augment` for partial indexes, partial unique indexes, and raw SQL
+- extension connection APIs under `/api/extension/*`
+
+## Setup
+
+1. Install dependencies.
+   `npm install`
+2. Prepare env files.
+   Copy `Example.env.local` into `.env.local` and fill in:
+   - `DATABASE_URL`
+   - `AUTH_SECRET`
+   - `AUTH_GOOGLE_ID`
+   - `AUTH_GOOGLE_SECRET`
+   - `NEXTAUTH_URL`
+   - `CLIP_API_ALLOWED_ORIGINS`
+3. Start the app.
+   `npm run dev`
+
+## Database
+
+This repo expects PostgreSQL. The current migration history has been rebuilt into a single init migration:
+
+- [prisma/migrations/20260430010000_init/migration.sql](/home/hiiro/repos/FigFingers/react--site/prisma/migrations/20260430010000_init/migration.sql:1)
+
+For a fresh local database:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx prisma migrate reset --force
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Prisma Augment Workflow
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+This project does not rely on plain `prisma migrate dev` alone. Partial indexes and partial unique indexes are generated from comments in [prisma/schema.prisma](/home/hiiro/repos/FigFingers/react--site/prisma/schema.prisma:1) by [scripts/prisma-augment.ts](/home/hiiro/repos/FigFingers/react--site/scripts/prisma-augment.ts:1).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+When adding a new migration:
 
-## Learn More
+1. Edit `prisma/schema.prisma`
+2. Create a skeleton migration
+   `npx prisma migrate dev --create-only --name <name>`
+3. Append augment-managed SQL
+   `node --import tsx scripts/prisma-augment.ts`
+4. Review the generated `migration.sql`
+5. Apply it
+   `npx prisma migrate dev`
 
-To learn more about Next.js, take a look at the following resources:
+If Prisma prompts you to create an extra migration after your intended migration has already been applied, stop and inspect the generated SQL before continuing. In this repo that usually means Prisma is trying to convert augment-managed partial indexes into normal diff output.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Extension APIs
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The extension connection flow is implemented on top of the DB/API redesign.
 
-## Deploy on Vercel
+- `GET /api/extension/session`
+- `POST /api/extension/link-token`
+- `POST /api/extension/link`
+- `POST /api/extension/sync`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The backing tables are:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `linked_extensions`
+- `extension_link_tokens`
+- `sync_receipts`
+
+`linked_extensions` uses augment-managed active-only indexes:
+
+- partial unique on `extension_instance_id` where `revoked_at IS NULL`
+- partial index on `(user_id, last_seen_at)` where `revoked_at IS NULL`
+
+## Legacy Ingest
+
+`POST /api/receive` is still present as a legacy ingest path for old clients.
+
+- It now requires an authenticated session
+- It now checks allowed origins
+- It converts legacy clip payloads into the current `clips` schema
+- It is frozen as a compatibility path and should not receive new extension features
+
+The intended long-term write path for extensions is `/api/extension/*`, not `/api/receive`.
+Once the browser extension has been migrated to the new handshake, `/api/receive` should be removed.

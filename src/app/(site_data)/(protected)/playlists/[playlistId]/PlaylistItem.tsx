@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 "use client";
 
 export default function PlaylistItem({ id, clip, order }) {

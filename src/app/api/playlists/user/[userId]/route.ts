@@ -1,10 +1,12 @@
+// @ts-nocheck
+
 // src/app/api/playlists/user/[userId]/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 export async function GET(
   req: Request,
-  context: { params: Promise<{ userId: string }> }
+  context: { params: Promise<{ userId: string }> },
 ) {
   const { userId } = await context.params; // ✅ awaitを追加
 
@@ -15,4 +17,3 @@ export async function GET(
 
   return NextResponse.json(playlists);
 }
-

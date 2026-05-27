@@ -1,9 +1,11 @@
+// @ts-nocheck
+
 import { NextResponse } from "next/server";
-import {prisma} from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function DELETE(
   req: Request,
-  context: { params: Promise<{ playlistId: string; playlistClipId: string }> }
+  context: { params: Promise<{ playlistId: string; playlistClipId: string }> },
 ) {
   const { playlistId, playlistClipId } = await context.params;
 

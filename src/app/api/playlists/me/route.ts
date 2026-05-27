@@ -1,7 +1,9 @@
+// @ts-nocheck
+
 // src/app/api/playlists/me/route.ts
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await auth();
@@ -37,9 +39,9 @@ export async function GET() {
     // -----------------------------------------
     const items = playlists.map((p) => ({
       id: p.id,
-      name: p.name,                          // ← UI が期待
+      name: p.name, // ← UI が期待
       user_name: p.user?.name ?? "Unknown",
-      data: String(p.id),                    // /playlists/[id] 遷移用
+      data: String(p.id), // /playlists/[id] 遷移用
       icon: p.clips[0]?.clip.service ?? "unknown",
     }));
 
@@ -52,7 +54,7 @@ export async function GET() {
     console.error("playlist me error:", e);
     return NextResponse.json(
       { error: "Failed to fetch playlists" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -1,61 +1,94 @@
-import { prisma } from '@/lib/prisma';
+import { auth } from "@/auth";
+import {
+  buildClipWriteCorsHeaders,
+  isAllowedClipWriteOrigin,
+} from "@/server/http/cors";
+import { toErrorPayload } from "@/server/http/errors";
+import { parseJsonBody } from "@/server/http/validation";
+import { legacyClipCreateBodySchema } from "@/server/schemas/legacy-clips.schema";
+import { createLegacyClip } from "@/server/services/legacy-clips";
 
 /**
- * POST /api/receive
- * 動画クリップ情報の保存
+ * Session-bound legacy ingest endpoint.
+ * This remains for old clients until /api/extension/* replaces it.
  */
 export async function POST(req) {
-  try {
-    const data = await req.json();
+  const headers = buildClipWriteCorsHeaders(req);
 
-    const result = await prisma.clip.create({
-      data: {
-        clipName:  data.clipName, 
-        user:      data.user,
-        service:   data.service,
-        startTime: data.StartTime,
-        endTime:   data.EndTime,
-        url:       data.URL,
-        title:     data.title,
-        epnumber:  data.epnumber,
+  if (!isAllowedClipWriteOrigin(req)) {
+    return new Response(
+      JSON.stringify({ message: "OriginNotAllowed", code: "FORBIDDEN" }),
+      {
+        status: 403,
+        headers,
       },
-    });
+    );
+  }
 
-    return new Response(JSON.stringify({ message: '保存完了', result }), {
-      status: 200,
-      headers: corsHeaders(),
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return new Response(
+        JSON.stringify({
+          message: "Authentication required",
+          code: "UNAUTHORIZED",
+        }),
+        {
+          status: 401,
+          headers,
+        },
+      );
+    }
+
+    const body = await parseJsonBody(req, legacyClipCreateBodySchema);
+    const userId = Number.parseInt(session.user.id, 10);
+    if (!Number.isSafeInteger(userId)) {
+      return new Response(
+        JSON.stringify({
+          message: "Invalid session user id",
+          code: "UNAUTHORIZED",
+        }),
+        {
+          status: 401,
+          headers,
+        },
+      );
+    }
+
+    const result = await createLegacyClip(userId, body);
+
+    return new Response(JSON.stringify({ message: "保存完了", result }), {
+      status: 201,
+      headers,
     });
   } catch (error) {
-    console.error('POST /api/receive エラー:', error);
-    return new Response(JSON.stringify({ message: '保存失敗', error: error.message }), {
-      status: 500,
-      headers: corsHeaders(),
+    const { status, body } = toErrorPayload(error, {
+      exposeDetails: process.env.NODE_ENV !== "production",
+    });
+
+    console.error("POST /api/receive error", error);
+
+    return new Response(JSON.stringify(body), {
+      status,
+      headers,
     });
   }
 }
 
 /**
  * OPTIONS /api/receive
- * プリフライトリクエストへの対応
  */
-export function OPTIONS() {
+export function OPTIONS(req) {
+  const headers = buildClipWriteCorsHeaders(req);
+  if (!isAllowedClipWriteOrigin(req)) {
+    return new Response(null, {
+      status: 403,
+      headers,
+    });
+  }
+
   return new Response(null, {
     status: 200,
-    headers: corsHeaders({
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    }),
+    headers,
   });
-}
-
-/**
- * CORSヘッダー共通設定
- */
-function corsHeaders(extra = {}) {
-  return {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    // 'Access-Control-Allow-Credentials': 'true', // 必要なら
-    ...extra,
-  };
 }

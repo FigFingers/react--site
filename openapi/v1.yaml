@@ -1,0 +1,2173 @@
+openapi: 3.1.0
+info:
+  title: VOD Clips API
+  version: 0.1.0
+  summary: API for managing users, VOD services, clips, playlists, and favorites.
+  description: >
+    Next.js / Prisma backend API. This is a v1 prototype specification.
+
+    Cursor pagination is used for list endpoints. Soft-deleted resources are hidden
+
+    from normal APIs and treated as not found.
+
+
+    Auth is expected via NextAuth session (cookie) or JWT bearer token. Most
+
+    write endpoints require authentication.
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Proprietary
+tags:
+  - name: Users
+    description: ユーザーと認証関連（/me含む）
+  - name: VODs
+    description: VODサービスと別名
+  - name: Clips
+    description: クリップ作成・閲覧・カウンタ
+  - name: Playlists
+    description: プレイリストと構成クリップ/VOD
+  - name: Favorites
+    description: クリップ/プレイリストのお気に入り
+  - name: Search
+    description: 統合検索
+  - name: Utilities
+    description: ヘルスチェックやユーティリティ
+  - name: Admin
+    description: 管理系
+x-tagGroups:
+  - name: Core
+    tags:
+      - VODs
+      - Clips
+      - Playlists
+  - name: Account
+    tags:
+      - Users
+      - Favorites
+  - name: Utilities
+    tags:
+      - Utilities
+      - Search
+  - name: Admin
+    tags:
+      - Admin
+servers:
+  - url: https://api.figfingers.dev/v1
+    description: Production
+  - url: https://staging-api.figfingers.dev/v1
+    description: Staging
+components:
+  securitySchemes:
+    nextAuthSession:
+      type: apiKey
+      in: cookie
+      name: next-auth.session-token
+      description: NextAuth session cookie. On some setups the cookie name can differ.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    CursorParam:
+      name: cursor
+      in: query
+      description: Opaque cursor returned by the previous response meta.nextCursor
+      schema:
+        type: string
+    LimitParam:
+      name: limit
+      in: query
+      description: Cursor page size (max 100)
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    IncludeDeletedParam:
+      name: includeDeleted
+      in: query
+      description: Include soft-deleted records (admin only, list endpoints only)
+      schema:
+        type: boolean
+        default: false
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    Conflict:
+      description: Conflict / Unique constraint violation
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+  schemas:
+    ID:
+      type: integer
+      minimum: 1
+    DateTime:
+      type: string
+      format: date-time
+      description: ISO8601 UTC
+    CursorPaginationMeta:
+      type: object
+      properties:
+        limit:
+          type: integer
+        hasNext:
+          type: boolean
+        nextCursor:
+          anyOf:
+            - type: string
+            - type: "null"
+      required:
+        - limit
+        - hasNext
+        - nextCursor
+      additionalProperties: false
+    Error:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+        code:
+          type: string
+        details:
+          type:
+            - object
+            - array
+            - string
+            - number
+            - boolean
+            - "null"
+    AdminUser:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        name:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+        emailVerified:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+        image:
+          type:
+            - string
+            - "null"
+          maxLength: 2048
+          format: uri
+        region:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
+        deletedAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+      additionalProperties: false
+    CurrentUser:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        name:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        email:
+          type:
+            - string
+            - "null"
+          format: email
+        emailVerified:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+        image:
+          type:
+            - string
+            - "null"
+          maxLength: 2048
+          format: uri
+        region:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
+      additionalProperties: false
+    UserCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        email:
+          type: string
+          format: email
+        image:
+          type: string
+          format: uri
+        region:
+          type: string
+          maxLength: 255
+      additionalProperties: false
+    UserUpdate:
+      type: object
+      properties:
+        name:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+        image:
+          type:
+            - string
+            - "null"
+          format: uri
+          maxLength: 2048
+        region:
+          type:
+            - string
+            - "null"
+          maxLength: 255
+      additionalProperties: false
+    Vod:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 255
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
+        deletedAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+      required:
+        - id
+        - code
+        - name
+      additionalProperties: false
+    VodCreate:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 255
+      additionalProperties: false
+    VodUpdate:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 50
+        name:
+          type: string
+          maxLength: 255
+      additionalProperties: false
+    VodAlias:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        vodId:
+          $ref: "#/components/schemas/ID"
+        alias:
+          type: string
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+      required:
+        - id
+        - vodId
+        - alias
+      additionalProperties: false
+    VodAliasCreate:
+      type: object
+      required:
+        - alias
+      properties:
+        alias:
+          type: string
+      additionalProperties: false
+    VodAliasUpdate:
+      type: object
+      properties:
+        alias:
+          type: string
+      additionalProperties: false
+    Clip:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        userId:
+          $ref: "#/components/schemas/ID"
+        vodId:
+          $ref: "#/components/schemas/ID"
+        name:
+          type: string
+          maxLength: 255
+        title:
+          type: string
+        views:
+          type: integer
+          format: int64
+          minimum: 0
+        startMs:
+          type: integer
+          minimum: 0
+        endMs:
+          type: integer
+          minimum: 0
+        url:
+          type: string
+          format: uri
+        epnum:
+          type:
+            - string
+            - "null"
+        durationMs:
+          type: integer
+          minimum: 0
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
+        deletedAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+      required:
+        - id
+        - userId
+        - vodId
+        - name
+        - title
+        - startMs
+        - endMs
+        - url
+      additionalProperties: false
+    ClipCreate:
+      type: object
+      required:
+        - vodId
+        - name
+        - title
+        - startMs
+        - endMs
+        - url
+      properties:
+        vodId:
+          $ref: "#/components/schemas/ID"
+        name:
+          type: string
+          maxLength: 255
+        title:
+          type: string
+        startMs:
+          type: integer
+          minimum: 0
+        endMs:
+          type: integer
+          minimum: 0
+        url:
+          type: string
+          format: uri
+        epnum:
+          type:
+            - string
+            - "null"
+      additionalProperties: false
+    ClipUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+        title:
+          type: string
+        startMs:
+          type: integer
+          minimum: 0
+        endMs:
+          type: integer
+          minimum: 0
+        url:
+          type: string
+          format: uri
+        epnum:
+          type:
+            - string
+            - "null"
+      additionalProperties: false
+    ExtensionSession:
+      type: object
+      properties:
+        loggedIn:
+          type: boolean
+      required:
+        - loggedIn
+      additionalProperties: false
+    ExtensionLinkTokenResponse:
+      type: object
+      properties:
+        linkToken:
+          type: string
+        expiresAt:
+          $ref: "#/components/schemas/DateTime"
+      required:
+        - linkToken
+        - expiresAt
+      additionalProperties: false
+    ExtensionLinkRequest:
+      type: object
+      required:
+        - extensionInstanceId
+        - linkToken
+      properties:
+        extensionInstanceId:
+          type: string
+          format: uuid
+        linkToken:
+          type: string
+      additionalProperties: false
+    ExtensionLinkResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        extensionAuthToken:
+          type: string
+      required:
+        - ok
+        - extensionAuthToken
+      additionalProperties: false
+    ExtensionSyncClipPayload:
+      type: object
+      required:
+        - service
+        - StartTime
+        - EndTime
+        - URL
+        - title
+      properties:
+        clipName:
+          type: string
+          maxLength: 255
+        service:
+          type: string
+        StartTime:
+          type: number
+          minimum: 0
+        EndTime:
+          type: number
+          minimum: 0
+        URL:
+          type: string
+        title:
+          type: string
+        epnumber:
+          type: string
+      additionalProperties: false
+    ExtensionSyncItem:
+      type: object
+      required:
+        - clientItemId
+        - type
+        - payload
+      properties:
+        clientItemId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum:
+            - clip
+        createdAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+        payload:
+          $ref: "#/components/schemas/ExtensionSyncClipPayload"
+      additionalProperties: false
+    ExtensionSyncRequest:
+      type: object
+      required:
+        - extensionInstanceId
+        - items
+      properties:
+        extensionInstanceId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ExtensionSyncItem"
+      additionalProperties: false
+    ExtensionSyncResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        acceptedItemIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+      required:
+        - ok
+        - acceptedItemIds
+      additionalProperties: false
+    Playlist:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/ID"
+        userId:
+          $ref: "#/components/schemas/ID"
+        name:
+          type: string
+          maxLength: 255
+        createdAt:
+          $ref: "#/components/schemas/DateTime"
+        updatedAt:
+          $ref: "#/components/schemas/DateTime"
+        deletedAt:
+          anyOf:
+            - $ref: "#/components/schemas/DateTime"
+            - type: "null"
+      required:
+        - id
+        - userId
+        - name
+      additionalProperties: false
+    PlaylistCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 255
+      additionalProperties: false
+    PlaylistUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 255
+      additionalProperties: false
+paths:
+  /health:
+    get:
+      operationId: utilities.health
+      x-permission: public
+      tags:
+        - Utilities
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /extension/session:
+    get:
+      operationId: extension.session
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Check whether the current browser session is logged in for extension handoff
+      security:
+        - nextAuthSession: []
+      responses:
+        "200":
+          description: Session state for extension connection
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionSession"
+        "403":
+          $ref: "#/components/responses/Unauthorized"
+  /extension/link-token:
+    post:
+      operationId: extension.linkToken.issue
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Issue a single-use link token for extension connection
+      security:
+        - nextAuthSession: []
+      responses:
+        "200":
+          description: Link token issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionLinkTokenResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Unauthorized"
+  /extension/link:
+    post:
+      operationId: extension.link
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Consume a link token and bind one extension instance to the current user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtensionLinkRequest"
+      responses:
+        "200":
+          description: Extension linked
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionLinkResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /extension/sync:
+    post:
+      operationId: extension.sync
+      x-permission: extension
+      tags:
+        - Utilities
+      summary: Sync clips from a linked extension instance using bearer auth
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ExtensionSyncRequest"
+      responses:
+        "200":
+          description: Sync completed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExtensionSyncResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /me:
+    get:
+      operationId: users.meGet
+      x-permission: auth
+      tags:
+        - Users
+      summary: Get current user
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CurrentUser"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /me/playlists:
+    get:
+      operationId: me.playlists.list
+      x-permission: auth
+      tags:
+        - Users
+      summary: List my playlists
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: My playlists (paginated)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: me.playlists.create
+      x-permission: auth
+      tags:
+        - Users
+      summary: Create my playlist
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaylistCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playlist"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  /me/vods:
+    get:
+      operationId: me.vods.list
+      x-permission: auth
+      tags:
+        - Users
+      summary: List my VODs
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: My VODs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vod"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: me.vods.add
+      x-permission: auth
+      tags:
+        - Users
+      summary: Add a VOD to me
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vodId
+              properties:
+                vodId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Added
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/me/vods/{vodId}":
+    delete:
+      operationId: me.vods.remove
+      x-permission: auth
+      tags:
+        - Users
+      summary: Remove a VOD from me
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - name: vodId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ID"
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /me/favorites/clips:
+    get:
+      operationId: me.favorites.clips.list
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: List my favorite clips (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Favorite clips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Clip"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: me.favorites.clips.add
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Favorite a clip (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clipId
+              properties:
+                clipId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Favorited
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/me/favorites/clips/{clipId}":
+    delete:
+      operationId: me.favorites.clips.remove
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Unfavorite a clip (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - name: clipId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ID"
+      responses:
+        "204":
+          description: Unfavorited
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /me/favorites/playlists:
+    get:
+      operationId: me.favorites.playlists.list
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: List my favorite playlists (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Favorite playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: me.favorites.playlists.add
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Favorite a playlist (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - playlistId
+              properties:
+                playlistId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Favorited
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/me/favorites/playlists/{playlistId}":
+    delete:
+      operationId: me.favorites.playlists.remove
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Unfavorite a playlist (via /me)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - name: playlistId
+          in: path
+          required: true
+          schema:
+            $ref: "#/components/schemas/ID"
+      responses:
+        "204":
+          description: Unfavorited
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /users:
+    get:
+      operationId: users.list
+      x-permission: admin
+      tags:
+        - Users
+      summary: List users (admin)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - $ref: "#/components/parameters/IncludeDeletedParam"
+      responses:
+        "200":
+          description: Paginated users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AdminUser"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: users.create
+      x-permission: admin
+      tags:
+        - Users
+      summary: Create user (admin/self-serve optional)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/users/{id}":
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: users.get
+      x-permission: admin
+      tags:
+        - Users
+      summary: Get user by id (admin)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: users.update
+      x-permission: admin
+      tags:
+        - Users
+      summary: Update user (self or admin)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUser"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      operationId: users.delete
+      x-permission: admin
+      tags:
+        - Users
+      summary: Delete user (soft by default)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /vods:
+    get:
+      operationId: vods.list
+      x-permission: public
+      tags:
+        - VODs
+      summary: List VOD services
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: code
+          in: query
+          schema:
+            type: string
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated VODs
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vod"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: vods.create
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Create VOD
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VodCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vod"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/vods/{vodId}":
+    parameters:
+      - name: vodId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: vods.get
+      x-permission: public
+      tags:
+        - VODs
+      summary: Get VOD by id
+      security: []
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vod"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: vods.update
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Update VOD
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VodUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Vod"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      operationId: vods.delete
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Delete VOD (soft)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  "/vods/{vodId}/aliases":
+    parameters:
+      - name: vodId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: vods.aliases.list
+      x-permission: public
+      tags:
+        - VODs
+      summary: List aliases for a VOD
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Aliases
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/VodAlias"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: vods.aliases.create
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Add alias to VOD
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VodAliasCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VodAlias"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/vods/{vodId}/aliases/{aliasId}":
+    parameters:
+      - name: vodId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+      - name: aliasId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    patch:
+      operationId: vods.aliases.update
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Update alias
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VodAliasUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VodAlias"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      operationId: vods.aliases.delete
+      x-permission: admin
+      tags:
+        - VODs
+      summary: Delete alias
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /clips:
+    get:
+      operationId: clips.list
+      x-permission: public
+      tags:
+        - Clips
+      summary: List clips
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: userId
+          in: query
+          schema:
+            $ref: "#/components/schemas/ID"
+        - name: vodId
+          in: query
+          schema:
+            $ref: "#/components/schemas/ID"
+        - name: title
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated clips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Clip"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: clips.create
+      x-permission: auth
+      tags:
+        - Clips
+      summary: Create clip (current user)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClipCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/clips/{clipId}":
+    parameters:
+      - name: clipId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: clips.get
+      x-permission: public
+      tags:
+        - Clips
+      summary: Get clip by id
+      security: []
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: clips.update
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Clips
+      summary: Update clip (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClipUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Clip"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      operationId: clips.delete
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Clips
+      summary: Delete clip (soft)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  "/clips/{clipId}/view":
+    parameters:
+      - name: clipId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    post:
+      operationId: clips.viewIncrement
+      x-permission: public
+      tags:
+        - Clips
+      summary: Increment view counter
+      security: []
+      responses:
+        "204":
+          description: Count incremented
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /playlists:
+    get:
+      operationId: playlists.list
+      x-permission: public
+      tags:
+        - Playlists
+      summary: List playlists
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - name: userId
+          in: query
+          schema:
+            $ref: "#/components/schemas/ID"
+        - name: name
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Paginated playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: playlists.create
+      x-permission: auth
+      tags:
+        - Playlists
+      summary: Create playlist (current user)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaylistCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playlist"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/playlists/{playlistId}":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: playlists.get
+      x-permission: public
+      tags:
+        - Playlists
+      summary: Get playlist by id
+      security: []
+      responses:
+        "200":
+          description: Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playlist"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      operationId: playlists.update
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Update playlist (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlaylistUpdate"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Playlist"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    delete:
+      operationId: playlists.delete
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Delete playlist (soft)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Deleted
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  "/playlists/{playlistId}/clips":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: playlists.clips.list
+      x-permission: public
+      tags:
+        - Playlists
+      summary: List clips in a playlist
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Clips in playlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Clip"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: playlists.clips.add
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Add a clip to playlist (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clipId
+              properties:
+                clipId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Added
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/playlists/{playlistId}/clips/{clipId}":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+      - name: clipId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    delete:
+      operationId: playlists.clips.remove
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Remove a clip from playlist (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  "/playlists/{playlistId}/vods":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: playlists.vods.list
+      x-permission: public
+      tags:
+        - Playlists
+      summary: List VODs associated to playlist
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: VODs in playlist
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vod"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: playlists.vods.add
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Attach a VOD to playlist (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vodId
+              properties:
+                vodId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Attached
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/playlists/{playlistId}/vods/{vodId}":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+      - name: vodId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    delete:
+      operationId: playlists.vods.remove
+      x-permission: ownerOrAdmin
+      x-admin-bypass: true
+      tags:
+        - Playlists
+      summary: Detach VOD from playlist (owner)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Detached
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  "/users/{userId}/vods":
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    get:
+      operationId: users.vods.list
+      x-permission: owner
+      tags:
+        - Users
+      summary: List VODs a user follows/uses
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: User-VOD relations
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vod"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: users.vods.add
+      x-permission: owner
+      tags:
+        - Users
+      summary: Add VOD to user (self)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - vodId
+              properties:
+                vodId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Added
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/users/{userId}/vods/{vodId}":
+    parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+      - name: vodId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    delete:
+      operationId: users.vods.remove
+      x-permission: owner
+      tags:
+        - Users
+      summary: Remove VOD from user (self)
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Removed
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /favorites/clips:
+    get:
+      operationId: favorites.clips.list
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: List my favorite clips
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Favorite clips
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Clip"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: favorites.clips.add
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Favorite a clip
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - clipId
+              properties:
+                clipId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Favorited
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/favorites/clips/{clipId}":
+    parameters:
+      - name: clipId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    delete:
+      operationId: favorites.clips.remove
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Unfavorite a clip
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Unfavorited
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /favorites/playlists:
+    get:
+      operationId: favorites.playlists.list
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: List my favorite playlists
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Favorite playlists
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - data
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"
+    post:
+      operationId: favorites.playlists.add
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Favorite a playlist
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - playlistId
+              properties:
+                playlistId:
+                  $ref: "#/components/schemas/ID"
+      responses:
+        "201":
+          description: Favorited
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+  "/favorites/playlists/{playlistId}":
+    parameters:
+      - name: playlistId
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ID"
+    delete:
+      operationId: favorites.playlists.remove
+      x-permission: auth
+      tags:
+        - Favorites
+      summary: Unfavorite a playlist
+      security:
+        - nextAuthSession: []
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Unfavorited
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /search:
+    get:
+      operationId: search.query
+      x-permission: public
+      tags:
+        - Search
+      summary: Unified search across clips, playlists, vods
+      security: []
+      description: >
+        Cursor-based search endpoint. When `type=all`, only the first page is
+        returned
+
+        and `nextCursor` is always null.
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum:
+              - all
+              - clips
+              - playlists
+              - vods
+            default: all
+        - $ref: "#/components/parameters/CursorParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clips:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Clip"
+                  playlists:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Playlist"
+                  vods:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Vod"
+                  meta:
+                    $ref: "#/components/schemas/CursorPaginationMeta"
+                required:
+                  - clips
+                  - playlists
+                  - vods
+                  - meta
+                additionalProperties: false
+        "400":
+          $ref: "#/components/responses/BadRequest"

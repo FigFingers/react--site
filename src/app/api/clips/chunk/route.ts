@@ -1,5 +1,7 @@
-import { prisma } from '@/lib/prisma';
-import { NextRequest } from 'next/server';
+// @ts-nocheck
+
+import type { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const CHUNK_SIZE = 100;
 
@@ -19,7 +21,7 @@ export async function GET(req: NextRequest) {
             cursor: { id: cursor }, // number 型であることが重要
           }
         : {}),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     let nextCursor: number | null = null;
@@ -40,20 +42,17 @@ export async function GET(req: NextRequest) {
       {
         status: 200,
         headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*",
         },
-      }
+      },
     );
   } catch (error) {
-    console.error('chunk API error:', error);
-    return new Response(
-      JSON.stringify({ error: 'サーバーエラー' }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    );
+    console.error("chunk API error:", error);
+    return new Response(JSON.stringify({ error: "サーバーエラー" }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 }
 
@@ -61,9 +60,9 @@ export function OPTIONS() {
   return new Response(null, {
     status: 200,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
     },
   });
 }

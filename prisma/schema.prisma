@@ -1,96 +1,286 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// prisma/schema.prisma
+/// @raw.sql CREATE EXTENSION IF NOT EXISTS citext;
+/// @raw.sql CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 generator client {
-  provider = "prisma-client-js"
+  provider = "prisma-client"
+  output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = "file:./dev.db"
+  provider = "postgresql"
+}
+
+// NextAuthのUserと統合
+model User {
+  id              BigInt    @id @default(autoincrement()) @db.BigInt
+  name            String?   @db.VarChar(255)
+  email           String?   @db.Citext
+  emailVerified   DateTime? @map("email_verified") @db.Timestamptz(6)
+  image           String?   @db.VarChar(2048)
+  hashedPassword  String?   @map("hashed_password") @db.VarChar(255)
+
+  // ドメイン属性
+  region    String?   @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6) // ソフトデリート用
+
+  // Auth リレーション
+  accounts Account[]
+  sessions Session[]
+
+  // ドメインリレーション
+  clips             Clip[]
+  playlists         Playlist[]
+  favoriteClips     FavoriteClip[]
+  favoritePlaylists FavoritePlaylist[]
+  usersVods         UserVod[]
+  linkedExtensions  LinkedExtension[]
+  extensionLinkTokens ExtensionLinkToken[]
+
+  /// @@partialUnique([email])
+  @@map("users")
+}
+
+model Vod {
+  id        Int    @id @default(autoincrement())
+  code      String    @db.VarChar(50)
+  name      String    @db.VarChar(255)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  clips         Clip[]
+  playlistsVods PlaylistVod[]
+  usersVods     UserVod[]
+  vodAliases    VodAlias[]
+
+  /// @@partialUnique([name])
+  /// @@partialUnique([code])
+  @@map("vods")
+}
+
+// 別名吸収用（“Prime”, “AmazonPrime” など）
+model VodAlias {
+  id        Int      @id @default(autoincrement())
+  vodId     Int      @map("vod_id")
+  alias     String   @db.Citext
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  vod Vod @relation(fields: [vodId], references: [id], onDelete: Cascade)
+
+  @@unique([alias])
+  @@index([vodId])
+  @@map("vod_aliases")
 }
 
 model Clip {
-  id            Int            @id @default(autoincrement()) // 自動採番の主キー
-  clipName      String? //クリップ名
-  user          String // ユーザー名
-  service       String // Netflix, Primeなど
-  startTime     Float // 開始時刻
-  endTime       Float // 終了時刻
-  url           String // 動画URLやパス
-  title         String // 動画タイトル
-  epnumber      String         @default("エピソード不明") // エピソード名や番号
-  createdAt     DateTime       @default(now()) // 登録日時
-  playlistClips PlaylistClip[]
+  id          BigInt    @id @default(autoincrement()) @db.BigInt
+  userId      BigInt    @map("user_id") @db.BigInt
+  vodId       Int       @map("vod_id")
+  name        String    @db.VarChar(255)
+  title       String
+  views       BigInt    @default(0) @db.BigInt
+  startMs     Int       @map("start_ms")
+  endMs       Int       @map("end_ms")
+  url         String
+  epnum       String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
+
+  favorites      FavoriteClip[]
+  clipsPlaylists ClipPlaylist[]
+
+  /// @@partialIndex([userId, createdAt])
+  /// @@partialIndex([vodId, createdAt])
+  @@map("clips")
 }
 
 model Playlist {
-  id        Int            @id @default(autoincrement())
-  name      String
-  user      User           @relation(fields: [userId], references: [id])
-  userId    String
-  clips     PlaylistClip[]
-  createdAt DateTime       @default(now())
-  updatedAt DateTime       @updatedAt
+  id        BigInt    @id @default(autoincrement()) @db.BigInt
+  name      String    @db.VarChar(255)
+  userId    BigInt    @map("user_id") @db.BigInt
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clipsPlaylists ClipPlaylist[]
+  playlistsVods  PlaylistVod[]
+  favorites      FavoritePlaylist[]
+
+  /// @@partialUnique([userId, name])
+  /// @@partialIndex([userId, createdAt])
+  @@map("playlists")
 }
 
-model PlaylistClip {
-  id         Int      @id @default(autoincrement())
-  playlistId Int
-  clipId     Int
-  order      Int       // 並び順
+model UserVod {
+  userId    BigInt    @map("user_id") @db.BigInt
+  vodId     Int       @map("vod_id")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  playlist   Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
-  clip       Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  vod  Vod  @relation(fields: [vodId], references: [id], onDelete: Cascade)
 
-  @@index([playlistId, order])
+  @@id([userId, vodId])
+  @@index([vodId])
+  @@map("users_vods")
 }
 
+model ClipPlaylist {
+  clipId      BigInt    @map("clip_id") @db.BigInt
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
 
-model User {
-  id    String  @id @default(cuid())
-  email String  @unique
-  name  String?
-  image String?
+  clip     Clip     @relation(fields: [clipId], references: [id], onDelete: Cascade)
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
 
-  nickname      String?
-  nicknameNorm  String?   @unique
-  // 認証用
-  passwordHash  String? // Credentials用（Googleのみ運用なら不要）
-  emailVerified DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  accounts      Account[]
-  sessions      Session[]
-
-  playlists Playlist[]
+  @@id([clipId, playlistId])
+  @@index([playlistId, createdAt])
+  @@map("clips_playlists")
 }
 
+model PlaylistVod {
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  vodId       Int       @map("vod_id")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  vod      Vod      @relation(fields: [vodId], references: [id], onDelete: Cascade)
+
+  @@id([playlistId, vodId])
+  @@index([vodId])
+  @@index([playlistId, createdAt])
+  @@map("playlists_vods")
+}
+
+model FavoriteClip {
+  userId    BigInt    @map("user_id") @db.BigInt
+  clipId    BigInt    @map("clip_id") @db.BigInt
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clip Clip @relation(fields: [clipId], references: [id], onDelete: Cascade)
+
+  @@id([userId, clipId])
+  @@index([userId, createdAt])
+  @@index([clipId])
+  @@map("favorite_clips")
+}
+
+model FavoritePlaylist {
+  userId      BigInt    @map("user_id") @db.BigInt
+  playlistId  BigInt    @map("playlist_id") @db.BigInt
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  playlist    Playlist  @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+
+  @@id([userId, playlistId])
+  @@index([userId, createdAt])
+  @@index([playlistId])
+  @@map("favorite_playlists")
+}
+
+model LinkedExtension {
+  id                  BigInt    @id @default(autoincrement()) @db.BigInt
+  userId              BigInt    @map("user_id") @db.BigInt
+  extensionInstanceId String    @map("extension_instance_id") @db.Uuid
+  extensionAuthHash   String    @map("extension_auth_hash") @db.VarChar(64)
+  linkedAt            DateTime  @default(now()) @map("linked_at") @db.Timestamptz(6)
+  lastSeenAt          DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt           DateTime? @map("revoked_at") @db.Timestamptz(6)
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncReceipts SyncReceipt[]
+
+  /// @@partialUnique([extensionInstanceId], name: "linked_extensions_extension_instance_id_active_unique", where: "revoked_at IS NULL")
+  /// @@partialIndex([userId, lastSeenAt], name: "linked_extensions_user_id_last_seen_active_idx", where: "revoked_at IS NULL")
+  @@map("linked_extensions")
+}
+
+model ExtensionLinkToken {
+  id        BigInt    @id @default(autoincrement()) @db.BigInt
+  userId    BigInt    @map("user_id") @db.BigInt
+  tokenHash String    @map("token_hash") @db.VarChar(64)
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([userId, expiresAt])
+  @@map("extension_link_tokens")
+}
+
+model SyncReceipt {
+  id                BigInt   @id @default(autoincrement()) @db.BigInt
+  linkedExtensionId BigInt   @map("linked_extension_id") @db.BigInt
+  clientItemId      String   @map("client_item_id") @db.Uuid
+  itemType          String   @map("item_type") @db.VarChar(50)
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  linkedExtension LinkedExtension @relation(fields: [linkedExtensionId], references: [id], onDelete: Cascade)
+
+  @@unique([linkedExtensionId, clientItemId])
+  @@index([linkedExtensionId, createdAt])
+  @@map("sync_receipts")
+}
+
+// NextAuth モデル
 model Account {
-  id                String  @id @default(cuid())
-  userId            String
+  id                Int     @id @default(autoincrement())
+  userId            BigInt  @map("user_id") @db.BigInt
   type              String
   provider          String
-  providerAccountId String
-  refresh_token     String?
-  access_token      String?
-  expires_at        Int?
-  token_type        String?
+  providerAccountId String  @map("provider_account_id")
+  refreshToken      String? @map("refresh_token") @db.Text
+  accessToken       String? @map("access_token") @db.Text
+  expiresAt         Int?    @map("expires_at")
+  tokenType         String? @map("token_type")
   scope             String?
-  id_token          String?
-  session_state     String?
-  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  idToken           String? @map("id_token") @db.Text
+  sessionState      String? @map("session_state")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
 }
 
 model Session {
   id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessionToken String   @unique @map("session_token")
+  userId       BigInt   @map("user_id") @db.BigInt
+  expires      DateTime @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+  @@map("sessions")
 }
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime @db.Timestamptz(6)
+
+  @@id([identifier, token])
+  @@map("verification_tokens")
+}
+
+/// @raw.sql ALTER TABLE "public"."clips"
+///   ADD CONSTRAINT clips_time_ck CHECK (start_ms >= 0 AND end_ms > start_ms);
+
+/// @raw.sql CREATE INDEX IF NOT EXISTS clips_title_trgm_gin
+///   ON "public"."clips" USING GIN (title gin_trgm_ops)
+///   WHERE deleted_at IS NULL;

@@ -49,3 +49,4 @@ next-env.d.ts
 
 # backup archives
 /backup_*.zip
+/backup_*.txt

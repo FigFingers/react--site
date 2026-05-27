@@ -46,3 +46,6 @@ next-env.d.ts
 # local docs
 /docs/
 /.claude
+
+# backup archives
+/backup_*.zip

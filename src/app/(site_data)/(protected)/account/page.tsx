@@ -1,52 +1,101 @@
-"use client";
-import '@/app/globals.css';
-import React from 'react';
-export default function App() {
-  return (
-    <>
+import "@/app/globals.css";
+import { redirect } from "next/navigation";
+import { auth } from "@/auth";
+import { ExtensionLinkButton } from "@/components/ExtensionLinkButton";
+import { prisma } from "@/server/db";
+import {
+  collectSubscriptionServices,
+  formatDateJa,
+  formatSubscriptionLabel,
+} from "./accountViewModel.mjs";
 
-      <div className="main-content">
+export const dynamic = "force-dynamic";
 
-        <div className="user-info">
+export default async function AccountPage() {
+  const session = await auth();
+
+  if (!session?.user?.id) {
+    redirect("/login");
+  }
+
+  const dbUser = await prisma.user.findUnique({
+    where: { id: BigInt(session.user.id) },
+    select: {
+      name: true,
+      email: true,
+      createdAt: true,
+      playlists: {
+        select: { id: true },
+      },
+    },
+  });
+
+  if (!dbUser) {
+    return (
+      <main className="main-content">
+        <section className="user-info">
           <h3>ユーザー情報</h3>
-          <button className="change-button">変更</button>
-          <table>
-            <tbody>
-              <tr>
-                <td>ユーザーid</td>
-                <td>000-0000-0000</td>
-              </tr>
-              <tr>
-                <td>ニックネーム</td>
-                <td>サブスク太郎</td>
-              </tr>
-              <tr>
-                <td>登録メールアドレス</td>
-                <td>sabusu@sabusu.com</td>
-              </tr>
-              <tr>
-                <td>使用サブスクリプション</td>
-                <td>Prime video / Netflix</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="settings">
-          <h3>設定</h3>
-          <table>
-            <tbody>
-              <tr>
-                <td>連続再生</td>
-                <td>連続再生許可 or 終了</td>
-              </tr>
-              <tr>
-                <td>プレイリスト再生</td>
-                <td>終了後繰り返し</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </>
+          <p>
+            ユーザー情報の取得に失敗しました。時間をおいて再読み込みしてください。
+          </p>
+        </section>
+      </main>
+    );
+  }
+
+  const subscriptionServices = collectSubscriptionServices([]);
+  const displayName = dbUser.name ?? "未設定";
+
+  return (
+    <main className="main-content">
+      <section className="user-info">
+        <h3>ユーザー情報</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>ニックネーム</td>
+              <td>{displayName}</td>
+            </tr>
+            <tr>
+              <td>登録メールアドレス</td>
+              <td>{dbUser.email ?? "未設定"}</td>
+            </tr>
+            <tr>
+              <td>登録日</td>
+              <td>{formatDateJa(dbUser.createdAt)}</td>
+            </tr>
+            <tr>
+              <td>作成プレイリスト数</td>
+              <td>{dbUser.playlists.length}件</td>
+            </tr>
+            <tr>
+              <td>使用サブスクリプション</td>
+              <td>{formatSubscriptionLabel(subscriptionServices)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="settings">
+        <h3>設定</h3>
+        <table>
+          <tbody>
+            <tr>
+              <td>連携再生成</td>
+              <td>連携再生成許可 or 終了</td>
+            </tr>
+            <tr>
+              <td>プレイリスト再生成</td>
+              <td>終了後繰り返し</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section className="settings">
+        <h3>Chrome拡張機能</h3>
+        <ExtensionLinkButton />
+      </section>
+    </main>
   );
 }

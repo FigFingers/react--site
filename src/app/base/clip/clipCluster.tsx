@@ -10,7 +10,7 @@ const DISPLAY_SIZE = 10;
 
 export default function ClipList({ clipApiUrl, userId }) {
   const [cache, setCache] = useState([]);
-  const [cursor, setCursor] = useState<number | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,7 +21,7 @@ export default function ClipList({ clipApiUrl, userId }) {
   // =========================
   // Chunk Fetch
   // =========================
-  const fetchChunk = async (cursorValue: number | null = null) => {
+  const fetchChunk = async (cursorValue: string | null = null) => {
     try {
       setLoading(true);
 
@@ -41,10 +41,10 @@ export default function ClipList({ clipApiUrl, userId }) {
       if (!text) throw new Error("レスポンスが空です");
 
       const json = JSON.parse(text);
-      if (!json.items) throw new Error("items がありません");
+      const items = normalizeClipItems(json);
 
-      setCache((prev) => [...prev, ...json.items]);
-      setCursor(json.nextCursor ?? null);
+      setCache((prev) => [...prev, ...items]);
+      setCursor(json.meta?.nextCursor ?? json.nextCursor ?? null);
     } catch (err: any) {
       console.error("データ取得エラー:", err);
       setError(err.message ?? String(err));
@@ -159,4 +159,25 @@ export default function ClipList({ clipApiUrl, userId }) {
       </div>
     </>
   );
+}
+
+function normalizeClipItems(json) {
+  const source = Array.isArray(json.data) ? json.data : json.items;
+  if (!Array.isArray(source)) throw new Error("items がありません");
+
+  return source.map((item) => ({
+    id: Number(item.id),
+    clipName: item.clipName ?? item.name,
+    title: item.title,
+    epnumber: item.epnumber ?? item.epnum,
+    url: item.url,
+    user: item.user ?? item.userName ?? "ユーザー不明",
+    service: item.service ?? item.vod?.code ?? "unknown",
+    startTime:
+      item.startTime ??
+      (typeof item.startMs === "number" ? item.startMs / 1000 : undefined),
+    endTime:
+      item.endTime ??
+      (typeof item.endMs === "number" ? item.endMs / 1000 : undefined),
+  }));
 }

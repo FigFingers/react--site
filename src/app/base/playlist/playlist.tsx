@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 //
 // --- 型定義 ------------------------------
@@ -9,15 +9,16 @@ import { useRouter } from "next/navigation";
 
 export interface PlaylistItem {
   id: number;
-  name: string;      
+  name: string;
   user_name: string;
   data: string;
 }
 
-
 export interface PlaylistApiResponse {
-  items: PlaylistItem[];
-  nextCursor: number | null;
+  items?: PlaylistItem[];
+  data?: Array<Record<string, unknown>>;
+  meta?: { nextCursor?: string | null };
+  nextCursor?: string | null;
 }
 
 interface PlayListProps {
@@ -47,7 +48,9 @@ function PlayList({ name, username, data }: PlayListProps) {
         <strong>{name}</strong>
       </p>
       <p>{username}</p>
-      <button onClick={handleClick}>go</button>
+      <button onClick={handleClick} type="button">
+        go
+      </button>
     </div>
   );
 }
@@ -58,9 +61,11 @@ function PlayList({ name, username, data }: PlayListProps) {
 
 const DISPLAY_SIZE = 10;
 
-export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterProps) {
+export default function PlayListCluster({
+  PlayList_Data_Url,
+}: PlayListClusterProps) {
   const [cache, setCache] = useState<PlaylistItem[]>([]);
-  const [cursor, setCursor] = useState<number | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
   const [visibleIndex, setVisibleIndex] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,14 +76,15 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
   // --- Fetch 処理 ------------------------
   //
 
-  const fetchChunk = async (cursorValue: number | null = null) => {
+  const fetchChunk = async (cursorValue: string | null = null) => {
     try {
       setLoading(true);
 
       const hasQuery = PlayList_Data_Url.includes("?");
-      const url = cursorValue !== null
-        ? `${PlayList_Data_Url}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
-        : PlayList_Data_Url;
+      const url =
+        cursorValue !== null
+          ? `${PlayList_Data_Url}${hasQuery ? "&" : "?"}cursor=${cursorValue}`
+          : PlayList_Data_Url;
 
       console.log("[PlayList] FETCH URL:", url);
 
@@ -86,14 +92,13 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
       if (!res.ok) throw new Error(`HTTP error: ${res.status}`);
 
       const json: PlaylistApiResponse = await res.json();
-      if (!json.items) throw new Error("Invalid API result: items missing");
+      const items = normalizePlaylistItems(json);
 
-      setCache((prev) => [...prev, ...json.items]);
-      setCursor(json.nextCursor ?? null);
-
-    } catch (err: any) {
+      setCache((prev) => [...prev, ...items]);
+      setCursor(json.meta?.nextCursor ?? json.nextCursor ?? null);
+    } catch (err: unknown) {
       console.error("Playlist fetch error:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -103,6 +108,7 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
   // --- 初回ロード & URL変更時のリセット ----
   //
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: legacy fetch callback is intentionally local to URL changes.
   useEffect(() => {
     setCache([]);
     setCursor(null);
@@ -125,8 +131,7 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
 
     const shouldFetch =
       cursor !== null &&
-      (nextIdx >= cache.length - DISPLAY_SIZE ||
-        cache.length - nextIdx < 30);
+      (nextIdx >= cache.length - DISPLAY_SIZE || cache.length - nextIdx < 30);
 
     if (shouldFetch) {
       fetchChunk(cursor);
@@ -140,10 +145,7 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
     if (prevIdx >= 0) setVisibleIndex(prevIdx);
   };
 
-  const visibleItems = cache.slice(
-    visibleIndex,
-    visibleIndex + DISPLAY_SIZE
-  );
+  const visibleItems = cache.slice(visibleIndex, visibleIndex + DISPLAY_SIZE);
 
   //
   // --- Rendering -------------------------
@@ -183,7 +185,9 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
         <button
           type="button"
           onClick={nextPage}
-          disabled={cursor === null && visibleIndex + DISPLAY_SIZE >= cache.length}
+          disabled={
+            cursor === null && visibleIndex + DISPLAY_SIZE >= cache.length
+          }
           className="px-4 py-2 rounded bg-gray-600 text-white disabled:bg-gray-400"
         >
           次へ
@@ -191,4 +195,27 @@ export default function PlayListCluster({ PlayList_Data_Url }: PlayListClusterPr
       </div>
     </>
   );
+}
+
+function normalizePlaylistItems(json: PlaylistApiResponse): PlaylistItem[] {
+  const source: unknown[] | undefined = Array.isArray(json.data)
+    ? json.data
+    : json.items;
+  if (!Array.isArray(source)) {
+    throw new Error("Invalid API result: items missing");
+  }
+
+  return source.map((rawItem) => {
+    const item =
+      typeof rawItem === "object" && rawItem !== null
+        ? (rawItem as Record<string, unknown>)
+        : {};
+
+    return {
+      id: Number(item.id),
+      name: String(item.name ?? "Untitled"),
+      user_name: String(item.user_name ?? item.userName ?? "unknown"),
+      data: String(item.data ?? item.id),
+    };
+  });
 }

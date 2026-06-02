@@ -1,9 +1,9 @@
 // src/app/(site_data)/(protected)/playlists/[playlistId]/SortableClipItem.tsx
 "use client";
 
-import { memo, useMemo } from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { memo, useMemo } from "react";
 import Clip from "@/app/base/clip/clipData";
 
 interface ClipData {
@@ -19,14 +19,20 @@ interface ClipData {
 }
 
 interface Props {
-  playlistClipId: number;
+  clipId: number;
   clip: ClipData;
   userId: string | null;
   isOwner: boolean;
   playlistId: number;
 }
 
-function SortableClipItem({ playlistClipId, playlistId, clip, userId, isOwner }: Props) {
+function SortableClipItem({
+  clipId,
+  playlistId,
+  clip,
+  userId,
+  isOwner,
+}: Props) {
   const {
     attributes,
     listeners,
@@ -34,7 +40,7 @@ function SortableClipItem({ playlistClipId, playlistId, clip, userId, isOwner }:
     setActivatorNodeRef,
     transform,
     transition,
-  } = useSortable({ id: playlistClipId });
+  } = useSortable({ id: clipId });
 
   const style = useMemo(
     () => ({
@@ -42,22 +48,22 @@ function SortableClipItem({ playlistClipId, playlistId, clip, userId, isOwner }:
       transition,
       touchAction: "none",
     }),
-    [transform, transition]
+    [transform, transition],
   );
 
   return (
-<div
-  ref={setNodeRef}
-  style={style}
-  className="
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="
     flex items-center justify-between
     p-3 rounded-lg border border-neutral-700
     bg-neutral-900/50 hover:bg-neutral-900/70 hover:border-neutral-500
     transition-colors
   "
->
-  {/* 左: Clip本体 */}
-  <div className="flex-1">
+    >
+      {/* 左: Clip本体 */}
+      <div className="flex-1">
         <Clip
           name={clip.clipName || "切り抜き"}
           title={clip.title || "タイトルがありません"}
@@ -71,33 +77,32 @@ function SortableClipItem({ playlistClipId, playlistId, clip, userId, isOwner }:
           Id={clip.id}
         />
       </div>
-       {/* 右: ハンドル & 削除 */}
-  {isOwner && (
-    <div className="flex items-center gap-3 ml-3 select-none">
-      <div
-        ref={setActivatorNodeRef}
-        {...listeners}
-        {...attributes}
-        className="cursor-grab active:cursor-grabbing text-neutral-400 hover:text-white transition text-lg"
-      >
-        ☰
-      </div>
+      {/* 右: ハンドル & 削除 */}
+      {isOwner && (
+        <div className="flex items-center gap-3 ml-3 select-none">
+          <div
+            ref={setActivatorNodeRef}
+            {...listeners}
+            {...attributes}
+            className="cursor-grab active:cursor-grabbing text-neutral-400 hover:text-white transition text-lg"
+          >
+            ☰
+          </div>
 
-      <button
-        onClick={async () => {
-            await fetch(`/api/playlists/${playlistId}/clips/${playlistClipId}`, {
-              method: "DELETE",
-            });
-            location.reload();
-          }}
-        className="text-red-400 hover:text-red-300 text-xl leading-none"
-      >
-        ×
-      </button>
-    </div>
-  )}
-
-
+          <button
+            type="button"
+            onClick={async () => {
+              await fetch(`/api/v1/playlists/${playlistId}/clips/${clipId}`, {
+                method: "DELETE",
+              });
+              location.reload();
+            }}
+            className="text-red-400 hover:text-red-300 text-xl leading-none"
+          >
+            ×
+          </button>
+        </div>
+      )}
     </div>
   );
 }

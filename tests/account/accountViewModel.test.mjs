@@ -1,5 +1,7 @@
-import test from "node:test";
+// biome-ignore-all lint/security/noSecrets: Japanese fixture text is a false positive.
+
 import assert from "node:assert/strict";
+import test from "node:test";
 import {
   collectSubscriptionServices,
   formatDateJa,
@@ -23,7 +25,10 @@ test("collectSubscriptionServices removes blanks and duplicates", () => {
 });
 
 test("formatSubscriptionLabel returns fallback text when empty", () => {
-  assert.equal(formatSubscriptionLabel([]), "\u672a\u9023\u643a\uff08\u4eee\u8868\u793a\uff09");
+  assert.equal(
+    formatSubscriptionLabel([]),
+    "\u672a\u9023\u643a\uff08\u4eee\u8868\u793a\uff09",
+  );
 });
 
 test("formatSubscriptionLabel joins labels with slash", () => {
@@ -34,5 +39,8 @@ test("formatSubscriptionLabel joins labels with slash", () => {
 });
 
 test("formatDateJa returns date in ja-JP locale", () => {
-  assert.equal(formatDateJa(new Date("2026-04-28T00:00:00.000Z")), "2026/04/28");
+  assert.equal(
+    formatDateJa(new Date("2026-04-28T00:00:00.000Z")),
+    "2026/04/28",
+  );
 });

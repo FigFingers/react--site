@@ -1,19 +1,30 @@
 "use client";
 
-// biome-ignore-all lint/security/noSecrets: Japanese UI labels are false positives.
-
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { linkExtensionToCurrentUser } from "@/lib/extension/client";
 
 type Status = "idle" | "loading" | "success" | "error";
 
+const MESSAGE_TIMEOUT =
+  // biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
+  "拡張機能が応答しませんでした。インストールされているか確認してください。";
+// biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
+const MESSAGE_AUTH = "ログイン状態を確認してから再度お試しください。";
+// biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
+const MESSAGE_SUCCESS = "拡張機能の連携が完了しました。";
+const LABEL_LOADING = "連携中...";
+// biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
+const LABEL_LINKED = "連携済み";
+// biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
+const LABEL_LINK = "拡張機能を連携する";
+
 function resolveErrorMessage(message: string): string {
   if (message === "Extension response timeout") {
-    return "拡張機能が応答しませんでした。インストールされているか確認してください。";
+    return MESSAGE_TIMEOUT;
   }
   if (message === "UNAUTHORIZED" || message === "Authentication required") {
-    return "ログイン状態を確認してから再度お試しください。";
+    return MESSAGE_AUTH;
   }
   return `連携に失敗しました: ${message}`;
 }
@@ -30,7 +41,7 @@ export function ExtensionLinkButton() {
     try {
       await linkExtensionToCurrentUser();
       setStatus("success");
-      setMessage("拡張機能の連携が完了しました。");
+      setMessage(MESSAGE_SUCCESS);
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
 
@@ -52,10 +63,10 @@ export function ExtensionLinkButton() {
         type="button"
       >
         {status === "loading"
-          ? "連携中..."
+          ? LABEL_LOADING
           : status === "success"
-            ? "連携済み"
-            : "拡張機能を連携する"}
+            ? LABEL_LINKED
+            : LABEL_LINK}
       </button>
       {message && (
         <p style={{ color: status === "success" ? "green" : "red" }}>

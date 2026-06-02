@@ -1,6 +1,10 @@
-import test from "node:test";
 import assert from "node:assert/strict";
-import { MAX_QUERY_LENGTH, parseKeywords, scoreFields } from "../../src/lib/search/utils.ts";
+import test from "node:test";
+import {
+  MAX_QUERY_LENGTH,
+  parseKeywords,
+  scoreFields,
+} from "../../src/lib/search/utils.ts";
 
 test("parseKeywords trims whitespace and splits on ASCII and full-width spaces", () => {
   assert.deepEqual(parseKeywords("  Netflix\u3000Prime   Video  "), [
@@ -13,7 +17,18 @@ test("parseKeywords trims whitespace and splits on ASCII and full-width spaces",
 test("parseKeywords drops empty tokens and caps keyword count", () => {
   assert.deepEqual(
     parseKeywords("one two three four five six seven eight nine ten eleven"),
-    ["one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"],
+    [
+      "one",
+      "two",
+      "three",
+      "four",
+      "five",
+      "six",
+      "seven",
+      "eight",
+      "nine",
+      "ten",
+    ],
   );
 });
 
@@ -34,7 +49,13 @@ test("scoreFields scores exact, prefix, and partial matches case-insensitively",
 });
 
 test("scoreFields uses the best field score once per keyword", () => {
-  assert.equal(scoreFields(["Netflix", "Netflix Original", "Best of Netflix"], ["netflix"]), 320);
+  assert.equal(
+    scoreFields(
+      ["Netflix", "Netflix Original", "Best of Netflix"],
+      ["netflix"],
+    ),
+    320,
+  );
 });
 
 test("scoreFields sums scores for multiple keywords", () => {

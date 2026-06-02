@@ -1,3 +1,5 @@
+// biome-ignore-all lint/security/noSecrets: Japanese fallback UI text is a false positive.
+
 export function formatDateJa(value) {
   return new Intl.DateTimeFormat("ja-JP", {
     year: "numeric",

@@ -13,7 +13,13 @@ info:
 
     Auth is expected via NextAuth session (cookie) or JWT bearer token. Most
 
-    write endpoints require authentication.
+    write endpoints require authentication. Auth.js-managed endpoints under
+
+    /api/auth/* are intentionally outside this v1 path contract; this document
+
+    describes how application APIs are secured, not the OAuth/session plumbing
+
+    routes themselves.
   license:
     name: Proprietary
     identifier: LicenseRef-Proprietary

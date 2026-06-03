@@ -8,6 +8,7 @@ This document compares `openapi/v1.yaml` with the current Next.js route handlers
 - Current `/api/v1` implementation provides 26 operations.
 - All currently implemented `/api/v1` operations are present in `openapi/v1.yaml`.
 - 28 OpenAPI operations are not yet implemented.
+- `/api/auth/*` is implemented but intentionally excluded from this inventory because it is managed by Auth.js / NextAuth, not by the v1 application API contract.
 
 ## Implemented
 
@@ -92,6 +93,7 @@ Needs design or policy work before implementation:
 ## Notes
 
 - Existing `/api/v1` implementation follows the shared `createRouteHandlers` pattern and central error handling.
+- Auth.js endpoints stay at `/api/auth/*`; `openapi/v1.yaml` models their effect through `securitySchemes`, not as application paths.
 - Current implemented `/me/*` list endpoints use cursor pagination and return `{ data, meta }`.
 - Current implemented `/clips` list endpoint uses cursor pagination and returns `{ data, meta }`.
 - Current implemented `/vods` and `/vods/{vodId}/aliases` list endpoints use cursor pagination and return `{ data, meta }`.

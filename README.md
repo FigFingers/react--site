@@ -72,6 +72,15 @@ The backing tables are:
 - partial unique on `extension_instance_id` where `revoked_at IS NULL`
 - partial index on `(user_id, last_seen_at)` where `revoked_at IS NULL`
 
+## Auth API Policy
+
+`/api/auth/*` is owned by Auth.js / NextAuth and is intentionally not modeled as a v1 application API path.
+
+- Keep the implementation at `src/app/api/auth/[...nextauth]/route.js`
+- Do not move Auth.js callback/session/provider routes under `/api/v1`
+- Represent auth in `openapi/v1.yaml` with `securitySchemes` and per-operation `security`
+- Document only application-owned auth-adjacent APIs such as `/me`
+
 ## Legacy Ingest
 
 `POST /api/receive` is still present as a legacy ingest path for old clients.

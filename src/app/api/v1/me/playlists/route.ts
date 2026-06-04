@@ -1,5 +1,6 @@
 import { createRouteHandlers } from "@/server/api/handler";
 import { requireUserId } from "@/server/auth/session";
+import { json } from "@/server/http/json";
 import {
   buildCursorPaginationMeta,
   parseCursorPagination,
@@ -27,12 +28,12 @@ export const { GET, POST } = createRouteHandlers({
       userId: userId,
     });
     const meta = buildCursorPaginationMeta(pagination, hasNext, nextCursor);
-    return Response.json({ data, meta });
+    return json({ data, meta });
   },
   POST: async (req) => {
     const userId = await requireUserId();
     const body = await parseJsonBody(req, playlistCreateBodySchema);
     const playlist = await createPlaylist(userId, body);
-    return Response.json(playlist, { status: 201 });
+    return json(playlist, { status: 201 });
   },
 });

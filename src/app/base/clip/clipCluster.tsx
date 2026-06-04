@@ -171,7 +171,7 @@ function normalizeClipItems(json) {
     title: item.title,
     epnumber: item.epnumber ?? item.epnum,
     url: item.url,
-    user: item.user ?? item.userName ?? "ユーザー不明",
+    user: item.user?.name ?? item.userName ?? "ユーザー不明",
     service: item.service ?? item.vod?.code ?? "unknown",
     startTime:
       item.startTime ??

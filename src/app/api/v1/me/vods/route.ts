@@ -1,5 +1,6 @@
 import { createRouteHandlers } from "@/server/api/handler";
 import { requireUserId } from "@/server/auth/session";
+import { json } from "@/server/http/json";
 import {
   buildCursorPaginationMeta,
   parseCursorPagination,
@@ -22,7 +23,7 @@ export const { GET, POST } = createRouteHandlers({
       limit: pagination.limit,
     });
     const meta = buildCursorPaginationMeta(pagination, hasNext, nextCursor);
-    return Response.json({ data, meta });
+    return json({ data, meta });
   },
   POST: async (req) => {
     const userId = await requireUserId();

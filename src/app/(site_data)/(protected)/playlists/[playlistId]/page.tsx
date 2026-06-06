@@ -2,8 +2,8 @@
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
+import { getCurrentUser } from "@/server/auth/session";
+import { getPlaylistWithClips } from "@/server/services/playlists";
 import PlaylistView from "./PlaylistView.client";
 
 type PlaylistPageProps = {
@@ -13,28 +13,12 @@ type PlaylistPageProps = {
 export default async function PlaylistPage({ params }: PlaylistPageProps) {
   const { playlistId } = await params;
 
-  const session = await auth();
-  const userId = session?.user?.id ?? null;
+  const [currentUser, playlist] = await Promise.all([
+    getCurrentUser({ id: true }),
+    getPlaylistWithClips(Number(playlistId)).catch(() => null),
+  ]);
 
-  const playlist = await prisma.playlist.findUnique({
-    where: { id: Number(playlistId) },
-    select: {
-      id: true,
-      name: true,
-      userId: true,
-      clipsPlaylists: {
-        orderBy: { createdAt: "desc" },
-        include: {
-          clip: {
-            include: {
-              user: true,
-              vod: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  const userId = currentUser ? String(currentUser.id) : null;
 
   if (!playlist) return <div>Not Found</div>;
 

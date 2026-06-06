@@ -6,6 +6,13 @@ export function findById(id: number) {
   return prisma.clip.findFirst({ where: { id, deletedAt: null } });
 }
 
+export function findByIdWithVod(id: number) {
+  return prisma.clip.findFirst({
+    where: { id, deletedAt: null },
+    include: { vod: true },
+  });
+}
+
 export async function list(
   opts: {
     skip?: number;

@@ -21,6 +21,12 @@ export async function getPlaylist(id: number) {
   return playlist;
 }
 
+export async function getPlaylistWithClips(id: number) {
+  const playlist = await repo.findWithClips(id);
+  if (!playlist) throw new NotFoundError("Playlist not found");
+  return playlist;
+}
+
 export function createPlaylist(
   currentUserId: number,
   data: Omit<Parameters<typeof repo.create>[0], "userId">,

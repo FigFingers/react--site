@@ -15,6 +15,12 @@ export async function getClip(id: number) {
   return clip;
 }
 
+export async function getClipWithVod(id: number) {
+  const clip = await repo.findByIdWithVod(id);
+  if (!clip) throw new NotFoundError("Clip not found");
+  return clip;
+}
+
 export function createClip(
   currentUserId: number,
   data: Omit<Parameters<typeof repo.create>[0], "userId">,

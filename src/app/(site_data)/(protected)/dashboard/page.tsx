@@ -1,6 +1,6 @@
 import { signIn, signOut } from "@/auth";
 import { getCurrentUser, getSession } from "@/server/auth/session";
-import { prisma } from "@/server/db";
+import { getUserAuthInfo } from "@/server/services/users";
 
 export const dynamic = "force-dynamic";
 
@@ -31,28 +31,7 @@ export default async function DashboardPage() {
     );
   }
 
-  const [accounts, sessions] = await Promise.all([
-    prisma.account.findMany({
-      where: { userId: currentUser.id },
-      orderBy: { id: "asc" },
-      select: {
-        id: true,
-        provider: true,
-        providerAccountId: true,
-        type: true,
-        scope: true,
-        expiresAt: true,
-      },
-    }),
-    prisma.session.findMany({
-      where: { userId: currentUser.id },
-      orderBy: { expires: "desc" },
-      select: {
-        id: true,
-        expires: true,
-      },
-    }),
-  ]);
+  const { accounts, sessions } = await getUserAuthInfo(Number(currentUser.id));
 
   return (
     <main className="main-content">

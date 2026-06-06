@@ -1,8 +1,7 @@
 import "@/app/globals.css";
 import { redirect } from "next/navigation";
-import { auth } from "@/auth";
 import { ExtensionLinkButton } from "@/components/ExtensionLinkButton";
-import { prisma } from "@/server/db";
+import { getCurrentUser } from "@/server/auth/session";
 import {
   collectSubscriptionServices,
   formatDateJa,
@@ -12,35 +11,15 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AccountPage() {
-  const session = await auth();
-
-  if (!session?.user?.id) {
-    redirect("/login");
-  }
-
-  const dbUser = await prisma.user.findUnique({
-    where: { id: BigInt(session.user.id) },
-    select: {
-      name: true,
-      email: true,
-      createdAt: true,
-      playlists: {
-        select: { id: true },
-      },
-    },
+  const dbUser = await getCurrentUser({
+    name: true,
+    email: true,
+    createdAt: true,
+    playlists: { select: { id: true } },
   });
 
   if (!dbUser) {
-    return (
-      <main className="main-content">
-        <section className="user-info">
-          <h3>ユーザー情報</h3>
-          <p>
-            ユーザー情報の取得に失敗しました。時間をおいて再読み込みしてください。
-          </p>
-        </section>
-      </main>
-    );
+    redirect("/login");
   }
 
   const subscriptionServices = collectSubscriptionServices([]);

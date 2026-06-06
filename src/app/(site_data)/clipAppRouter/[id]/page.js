@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
+import { isNotFoundError } from "@/server/http/errors";
+import { getClipWithVod } from "@/server/services/clips";
 
 export const dynamic = "force-dynamic";
 
@@ -8,9 +9,9 @@ export default async function ClipPage({ params }) {
 
   if (!id) return <h1>Missing ID</h1>;
 
-  const clip = await prisma.clip.findFirst({
-    where: { id: Number(id), deletedAt: null },
-    include: { vod: true },
+  const clip = await getClipWithVod(Number(id)).catch((err) => {
+    if (isNotFoundError(err)) return null;
+    throw err;
   });
 
   if (!clip) return <h1>Not Found</h1>;

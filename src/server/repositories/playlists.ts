@@ -6,6 +6,28 @@ export function findById(id: number) {
   return prisma.playlist.findFirst({ where: { id, deletedAt: null } });
 }
 
+export function findWithClips(id: number) {
+  return prisma.playlist.findFirst({
+    where: { id, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      userId: true,
+      clipsPlaylists: {
+        orderBy: { createdAt: "desc" },
+        include: {
+          clip: {
+            include: {
+              user: true,
+              vod: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
 export async function list(
   opts: {
     skip?: number;

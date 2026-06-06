@@ -9,6 +9,10 @@ export function listUsers(opts: Parameters<typeof repo.list>[0]) {
   return repo.list(opts);
 }
 
+export function getUserAuthInfo(userId: number) {
+  return repo.getUserAuthInfo(userId);
+}
+
 export async function getUser(id: number) {
   const user = await repo.findById(id);
   if (!user) throw new NotFoundError("User not found");

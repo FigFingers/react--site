@@ -145,3 +145,29 @@ export async function removeUserVod(userId: number, vodId: number) {
   const result = await prisma.userVod.deleteMany({ where: { userId, vodId } });
   return result.count;
 }
+
+export async function getUserAuthInfo(userId: number) {
+  const [accounts, sessions] = await Promise.all([
+    prisma.account.findMany({
+      where: { userId },
+      orderBy: { id: "asc" },
+      select: {
+        id: true,
+        provider: true,
+        providerAccountId: true,
+        type: true,
+        scope: true,
+        expiresAt: true,
+      },
+    }),
+    prisma.session.findMany({
+      where: { userId },
+      orderBy: { expires: "desc" },
+      select: {
+        id: true,
+        expires: true,
+      },
+    }),
+  ]);
+  return { accounts, sessions };
+}

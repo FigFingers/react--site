@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 
 import { getCurrentUser } from "@/server/auth/session";
+import { isNotFoundError } from "@/server/http/errors";
 import { getPlaylistWithClips } from "@/server/services/playlists";
 import PlaylistView from "./PlaylistView.client";
 
@@ -15,7 +16,10 @@ export default async function PlaylistPage({ params }: PlaylistPageProps) {
 
   const [currentUser, playlist] = await Promise.all([
     getCurrentUser({ id: true }),
-    getPlaylistWithClips(Number(playlistId)).catch(() => null),
+    getPlaylistWithClips(Number(playlistId)).catch((err) => {
+      if (isNotFoundError(err)) return null;
+      throw err;
+    }),
   ]);
 
   const userId = currentUser ? String(currentUser.id) : null;

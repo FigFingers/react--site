@@ -6,7 +6,7 @@ import {
   collectSubscriptionServices,
   formatDateJa,
   formatSubscriptionLabel,
-} from "./accountViewModel.mjs";
+} from "./accountViewModel";
 
 export const dynamic = "force-dynamic";
 

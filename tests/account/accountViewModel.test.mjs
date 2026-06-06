@@ -6,7 +6,7 @@ import {
   collectSubscriptionServices,
   formatDateJa,
   formatSubscriptionLabel,
-} from "../../src/app/(site_data)/(protected)/account/accountViewModel.mjs";
+} from "../../src/app/(site_data)/(protected)/account/accountViewModel.ts";
 
 test("collectSubscriptionServices removes blanks and duplicates", () => {
   const clips = [

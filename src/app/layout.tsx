@@ -2,14 +2,13 @@ import "./globals.css";
 import Sidebar from "@/app/base/_components/sidebar/sidebar";
 import HeadSearch from "@/app/base/_components/headSearch/headSearch";
 import { SessionProvider } from "@/providers/session-provider";
-import { auth } from "@/auth"; // サーバー側のauth関数
+import { getSession } from "@/server/auth/session";
 import React from "react";
 
 export const metadata = { title: "My App", description: "…" };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // サーバーでセッションを取得
-  const session = await auth();
+  const session = await getSession();
 
   return (
     <html lang="ja">

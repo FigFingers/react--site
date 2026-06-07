@@ -1,13 +1,13 @@
 import ClipList from "@/app/base/clip/clipCluster";
 import PlayList from "@/app/base/playlist/playlist";
-import { auth } from "@/auth";
+import { getCurrentUser } from "@/server/auth/session";
 
 export default async function SearchPage({ searchParams }) {
   const params = await searchParams;
   const q = params.q ?? "";
 
-  const session = await auth();
-  const userId = session?.user?.id ?? null;
+  const user = await getCurrentUser({ id: true });
+  const userId = user?.id ?? null;
 
   return (
     <>

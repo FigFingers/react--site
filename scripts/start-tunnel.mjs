@@ -27,9 +27,15 @@ if (!DB_SSH_USER || !DB_SSH_PORT) {
 // ポート 5432 が既に開いていれば二重起動をスキップ
 const alreadyOpen = await new Promise((resolve) => {
   const s = createConnection({ port: 5432, host: "127.0.0.1" });
-  s.on("connect", () => { s.destroy(); resolve(true); });
+  s.on("connect", () => {
+    s.destroy();
+    resolve(true);
+  });
   s.on("error", () => resolve(false));
-  setTimeout(() => { s.destroy(); resolve(false); }, 500);
+  setTimeout(() => {
+    s.destroy();
+    resolve(false);
+  }, 500);
 });
 
 if (alreadyOpen) {
@@ -42,13 +48,26 @@ const sshCandidates = [
   "/usr/bin/ssh",
 ];
 const sshExe = sshCandidates.find((p) => existsSync(p)) ?? "ssh";
-const keyPath = join(process.env.USERPROFILE ?? process.env.HOME, ".ssh", "id_rsa");
+const keyPath = join(
+  process.env.USERPROFILE ?? process.env.HOME,
+  ".ssh",
+  "id_rsa",
+);
 
 console.log(`[tunnel] starting ${DB_SSH_USER} port ${DB_SSH_PORT}...`);
 
 const child = spawn(
   sshExe,
-  ["-i", keyPath, "-p", DB_SSH_PORT, "-N", "-L", "5432:localhost:5432", DB_SSH_USER],
+  [
+    "-i",
+    keyPath,
+    "-p",
+    DB_SSH_PORT,
+    "-N",
+    "-L",
+    "5432:localhost:5432",
+    DB_SSH_USER,
+  ],
   { detached: true, stdio: ["ignore", "ignore", "pipe"] },
 );
 
@@ -57,7 +76,9 @@ child.stderr.pipe(process.stderr);
 try {
   await new Promise((resolve, reject) => {
     child.on("error", reject);
-    child.on("exit", (code) => reject(new Error(`SSH exited prematurely (code ${code})`)));
+    child.on("exit", (code) =>
+      reject(new Error(`SSH exited prematurely (code ${code})`)),
+    );
     setTimeout(resolve, 2000);
   });
 } catch (e) {

@@ -1,13 +1,17 @@
 import "./globals.css";
-import Sidebar from "@/app/base/_components/sidebar/sidebar";
+import type React from "react";
 import HeadSearch from "@/app/base/_components/headSearch/headSearch";
+import Sidebar from "@/app/base/_components/sidebar/sidebar";
 import { SessionProvider } from "@/providers/session-provider";
 import { getSession } from "@/server/auth/session";
-import React from "react";
 
 export const metadata = { title: "My App", description: "…" };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const session = await getSession();
 
   return (
@@ -16,9 +20,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* ここでセッションを初期値として渡す */}
         <SessionProvider session={session}>
           <div className="app-shell">
-            <aside className="sidebar"><Sidebar /></aside>
+            <aside className="sidebar">
+              <Sidebar />
+            </aside>
             <div className="main-column">
-              <header className="header"><HeadSearch /></header>
+              <header className="header">
+                <HeadSearch />
+              </header>
               <main className="main-content">{children}</main>
             </div>
           </div>

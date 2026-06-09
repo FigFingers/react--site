@@ -35,9 +35,13 @@ export default function HeadSearch() {
     }
     if (!session?.user) {
       return (
-        <div className="cursor-pointer" onClick={() => signIn("google")}>
+        <button
+          type="button"
+          className="cursor-pointer"
+          onClick={() => signIn("google")}
+        >
           <AccountCircleIcon fontSize="large" />
-        </div>
+        </button>
       );
     }
     if (session.user.image) {
@@ -56,12 +60,13 @@ export default function HeadSearch() {
       .slice(0, 1)
       .toUpperCase();
     return (
-      <div
+      <button
+        type="button"
         className="h-10 w-10 rounded-full bg-gray-300 grid place-items-center text-sm font-semibold text-gray-700 cursor-pointer"
         onClick={() => signOut()}
       >
         {initial}
-      </div>
+      </button>
     );
   };
 

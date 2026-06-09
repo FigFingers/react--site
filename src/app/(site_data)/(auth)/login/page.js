@@ -72,9 +72,9 @@ function Page() {
               </button>
             </div>
           </form>
-          <a href="#" className="login-link-test">
+          <button type="button" className="login-link-test">
             パスワードをお忘れですか？
-          </a>
+          </button>
         </div>
 
         {/* 会員登録がお済みでないお客様 */}
@@ -84,6 +84,7 @@ function Page() {
             会員登録がお済みでないお客様はこちらより新規会員登録へお進みください。
           </p>
           <button
+            type="button"
             className="login-button-test"
             onClick={() => {
               window.location.href = "/registration";
@@ -91,12 +92,15 @@ function Page() {
           >
             新規会員登録
           </button>
-          <a href="#" className="login-link-test">
+          <button type="button" className="login-link-test">
             会員登録について
-          </a>
+          </button>
 
           <br />
-          <button onClick={() => signIn("google", { callbackUrl: "/account" })}>
+          <button
+            type="button"
+            onClick={() => signIn("google", { callbackUrl: "/account" })}
+          >
             Googleでログイン
           </button>
         </div>

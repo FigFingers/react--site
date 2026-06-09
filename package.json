@@ -6,7 +6,7 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "dev": "node scripts/start-tunnel.mjs && next dev",
+    "dev": "node scripts/start-tunnel.mjs && npm run lint && next dev",
     "dev:local": "next dev",
     "build": "next build",
     "start": "next start",

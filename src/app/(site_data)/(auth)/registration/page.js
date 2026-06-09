@@ -10,12 +10,14 @@ function RegisterPage() {
   const handleRegister = (e) => {
     e.preventDefault();
     if (password !== confirmPassword) {
+      // biome-ignore lint/security/noSecrets: false positive — Japanese UI text
       alert("パスワードが一致しません。");
       return;
     }
     console.log("ユーザー名:", username);
     console.log("メールアドレス:", email);
     console.log("パスワード:", password);
+    // biome-ignore lint/security/noSecrets: false positive — Japanese UI text
     alert("会員登録が完了しました！");
   };
 

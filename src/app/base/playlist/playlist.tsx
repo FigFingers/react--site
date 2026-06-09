@@ -214,7 +214,12 @@ function normalizePlaylistItems(json: PlaylistApiResponse): PlaylistItem[] {
     return {
       id: Number(item.id),
       name: String(item.name ?? "Untitled"),
-      user_name: String((item.user as Record<string, unknown>)?.name ?? item.user_name ?? item.userName ?? "unknown"),
+      user_name: String(
+        (item.user as Record<string, unknown>)?.name ??
+          item.user_name ??
+          item.userName ??
+          "unknown",
+      ),
       data: String(item.data ?? item.id),
     };
   });

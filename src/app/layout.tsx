@@ -1,15 +1,18 @@
 import "./globals.css";
-import Sidebar from "@/app/base/_components/sidebar/sidebar";
+import type React from "react";
 import HeadSearch from "@/app/base/_components/headSearch/headSearch";
+import Sidebar from "@/app/base/_components/sidebar/sidebar";
 import { SessionProvider } from "@/providers/session-provider";
-import { auth } from "@/auth"; // サーバー側のauth関数
-import React from "react";
+import { getSession } from "@/server/auth/session";
 
 export const metadata = { title: "My App", description: "…" };
 
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  // サーバーでセッションを取得
-  const session = await auth();
+export default async function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getSession();
 
   return (
     <html lang="ja">
@@ -17,9 +20,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         {/* ここでセッションを初期値として渡す */}
         <SessionProvider session={session}>
           <div className="app-shell">
-            <aside className="sidebar"><Sidebar /></aside>
+            <aside className="sidebar">
+              <Sidebar />
+            </aside>
             <div className="main-column">
-              <header className="header"><HeadSearch /></header>
+              <header className="header">
+                <HeadSearch />
+              </header>
               <main className="main-content">{children}</main>
             </div>
           </div>

@@ -6,7 +6,8 @@
     "node": ">=24.0.0 <25"
   },
   "scripts": {
-    "dev": "next dev",
+    "dev": "node scripts/start-tunnel.mjs && npm run lint && next dev",
+    "dev:local": "next dev",
     "build": "next build",
     "start": "next start",
     "db:seed": "tsx prisma/seed.ts",
@@ -32,6 +33,7 @@
     "@prisma/client": "^7.4.0",
     "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.29",
+    "pg": "^8.21.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "swr": "^2.3.6",

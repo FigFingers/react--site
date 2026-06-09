@@ -1,4 +1,4 @@
-.app{
+.app {
   width: 100%;
   height: 100%;
 }
@@ -9,15 +9,16 @@
   font-family: Arial, sans-serif;
 }
 
-html,body {
+html,
+body {
   height: 100%;
   background-color: #f5f5f5;
 }
 /* メインコンテンツ */
 .main-content {
   margin-left: 0;
-  padding: 20px 20px 20px 0; 
-  min-width: 0;      /* 子が横に広がっても潰れにくくする */
+  padding: 20px 20px 20px 0;
+  min-width: 0; /* 子が横に広がっても潰れにくくする */
   background-color: #f5f5f5;
   padding-top: 0;
   margin-top: 0;
@@ -25,21 +26,21 @@ html,body {
 .app-shell {
   display: grid;
   grid-template-columns: 250px 1fr; /* 左: 250px / 右: 残り全て */
-  min-height: 100dvh;               /* モバイルでも安定 */
+  min-height: 100dvh; /* モバイルでも安定 */
 }
 .app-container {
   width: 100%;
-  max-width: 1100px;   /* 好みで 960 / 1100 / 1280 に調整 */
+  max-width: 1100px; /* 好みで 960 / 1100 / 1280 に調整 */
   margin: 16px 20px 24px 0;
-  column-gap: 0;    
+  column-gap: 0;
   padding: 0 16px;
 }
 
 /* サイドバー */
 .sidebar {
-  position: sticky;  /* スクロールしても見えるようにするなら sticky */
+  position: sticky; /* スクロールしても見えるようにするなら sticky */
   top: 0;
-  height: 100vh;     /* 100% だと親の高さに依存して縮むことがある */
+  height: 100vh; /* 100% だと親の高さに依存して縮むことがある */
   background-color: #2d445d;
 }
 
@@ -75,27 +76,26 @@ html,body {
 .row #title {
   flex: 70%;
 }
-.sidebarIcon{
+.sidebarIcon {
   padding-top: 20px;
   padding-bottom: 15px;
   text-align: center;
 }
-.sidebarIcon img{
+.sidebarIcon img {
   width: 100px;
 }
-.sidebarIcon p{
+.sidebarIcon p {
   color: white;
   font-weight: 600;
   font-size: 13px;
 }
 
-
 /* ヘッダー */
 .header {
-  position: sticky;     /* ← display: sticky は存在しないので修正 */
+  position: sticky; /* ← display: sticky は存在しないので修正 */
   top: 0;
   z-index: 10;
-  display: flex;        /* 本来やりたかったのはこれ */
+  display: flex; /* 本来やりたかったのはこれ */
   align-items: center;
   justify-content: space-between;
   background-color: #d3d3d3;
@@ -151,7 +151,7 @@ html,body {
   margin-top: 20px;
   background-color: #ffffff;
   border-top: 1px solid #ccc;
-  width: 100%;        /* これを明示 */
+  width: 100%; /* これを明示 */
 }
 
 .list-item {
@@ -163,25 +163,28 @@ html,body {
 }
 
 /* account画面のコンテンツ */
-.user-info, .settings {
-background-color: #fff;
-border: 1px solid #ccc;
-padding: 20px;
-margin-bottom: 20px;
+.user-info,
+.settings {
+  background-color: #fff;
+  border: 1px solid #ccc;
+  padding: 20px;
+  margin-bottom: 20px;
 }
-.user-info table, .settings table {
-width: 100%;
-border-collapse: collapse;
+.user-info table,
+.settings table {
+  width: 100%;
+  border-collapse: collapse;
 }
-.user-info td, .settings td {
-padding: 10px;
-border: 1px solid #ccc;
+.user-info td,
+.settings td {
+  padding: 10px;
+  border: 1px solid #ccc;
 }
 .change-button {
-       float: right;
-       padding: 5px 10px;
-       font-size: 14px;
-       cursor: pointer;
+  float: right;
+  padding: 5px 10px;
+  font-size: 14px;
+  cursor: pointer;
 }
 /* login画面のコンテンツ */
 .login-container-test {
@@ -244,7 +247,7 @@ border: 1px solid #ccc;
 
 .login-link-test {
   font-size: 0.9rem;
-  color: #007BFF;
+  color: #007bff;
   text-decoration: none;
 }
 

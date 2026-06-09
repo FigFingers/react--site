@@ -96,16 +96,17 @@ function Page() {
               会員登録について
             </a>
 
-            <br/>
-          <button onClick={() => signIn("google", { callbackUrl: "/account" })}>
-            Googleでログイン
-          </button>
+            <br />
+            <button
+              onClick={() => signIn("google", { callbackUrl: "/account" })}
+            >
+              Googleでログイン
+            </button>
           </div>
         </div>
       </main>
     </>
   );
 }
-
 
 export default Page;

@@ -11,7 +11,6 @@ export default function HeadSearch() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
-
   const handleSearch = () => {
     const q = searchText.trim();
     if (!q) return;
@@ -36,10 +35,7 @@ export default function HeadSearch() {
     }
     if (!session?.user) {
       return (
-        <div
-          className="cursor-pointer"
-          onClick={() => signIn("google")}
-        >
+        <div className="cursor-pointer" onClick={() => signIn("google")}>
           <AccountCircleIcon fontSize="large" />
         </div>
       );

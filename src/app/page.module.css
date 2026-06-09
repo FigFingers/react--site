@@ -9,13 +9,12 @@
   display: grid;
   grid-template-rows: 20px 1fr 20px;
   justify-content: center; /* 追加 */
-  align-content: center;   /* 追加 */
-  min-height: 100vh;       /* 修正: 100svh → 100vh */
+  align-content: center; /* 追加 */
+  min-height: 100vh; /* 修正: 100svh → 100vh */
   padding: 80px;
   gap: 64px;
   font-family: var(--font-geist-sans);
 }
-
 
 @media (prefers-color-scheme: dark) {
   .page {
@@ -29,15 +28,15 @@
 }
 
 .main {
-  display: flex;           /* Flexboxを追加 */
+  display: flex; /* Flexboxを追加 */
   flex-direction: column;
   justify-content: center; /* 縦方向に中央揃え */
-  align-items: center;     /* 水平方向に中央揃え */
+  align-items: center; /* 水平方向に中央揃え */
   gap: 32px;
   grid-row-start: 2;
   width: 100%;
   max-width: 600px;
-  margin: 0 auto;          /* コンテンツ幅を中央に配置 */
+  margin: 0 auto; /* コンテンツ幅を中央に配置 */
 }
 
 .main ol {

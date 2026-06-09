@@ -1,8 +1,7 @@
-import React from "react";
-import HomeIcon from "@mui/icons-material/Home";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
-import MovieIcon from "@mui/icons-material/Movie";
 import FolderIcon from "@mui/icons-material/Folder";
+import HomeIcon from "@mui/icons-material/Home";
+import MovieIcon from "@mui/icons-material/Movie";
 
 export const SidebarData = [
   {

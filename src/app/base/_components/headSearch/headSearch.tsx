@@ -1,10 +1,10 @@
 "use client";
-import React, { useState } from "react";
-import Image from "next/image";
 import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import SearchIcon from "@mui/icons-material/Search";
-import { useSession, signIn, signOut } from "next-auth/react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { signIn, signOut, useSession } from "next-auth/react";
+import { type ChangeEvent, type KeyboardEvent, useState } from "react";
 
 export default function HeadSearch() {
   const [searchText, setSearchText] = useState("");
@@ -19,11 +19,11 @@ export default function HeadSearch() {
     // ※ 検索結果ページで自動的に q を拾うため、ここで消す必要はない
   };
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     setSearchText(e.target.value);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSearch();
     }

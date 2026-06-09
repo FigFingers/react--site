@@ -37,9 +37,10 @@ if (!DB_SSH_USER || !DB_SSH_PORT) {
 const localPort = Number(env.DB_TUNNEL_LOCAL_PORT ?? "5432");
 const remoteHost = env.DB_TUNNEL_REMOTE_HOST ?? "localhost";
 const remotePort = env.DB_TUNNEL_REMOTE_PORT ?? "5432";
-const keyPath =
-  env.DB_SSH_KEY_PATH ??
-  join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".ssh", "id_rsa");
+const home = process.env.USERPROFILE ?? process.env.HOME ?? "";
+const rawKeyPath = env.DB_SSH_KEY_PATH ?? join(home, ".ssh", "id_rsa");
+// spawn() はシェルを介さないため ~ を展開する
+const keyPath = rawKeyPath.replace(/^~(?=[/\\])/, home);
 
 // PID ファイルが残っている場合: プロセスが生きていればスキップ、死んでいれば削除
 if (existsSync(pidFile)) {

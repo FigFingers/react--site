@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "node scripts/start-tunnel.mjs && next dev",
+    "dev:local": "next dev",
     "build": "next build",
     "start": "next start",
     "db:seed": "tsx prisma/seed.ts",
@@ -29,7 +30,7 @@
     "@mui/icons-material": "^7.3.7",
     "@mui/material": "^7.3.7",
     "@prisma/adapter-pg": "^7.8.0",
-    "@prisma/client": "^7.4.0",
+    "@prisma/client": "^7.8.0",
     "next": "^16.1.6",
     "next-auth": "^5.0.0-beta.29",
     "pg": "^8.21.0",
@@ -49,7 +50,7 @@
     "@types/react-dom": "^19.2.3",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
-    "prisma": "^7.4.0",
+    "prisma": "^7.8.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

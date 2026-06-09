@@ -1,32 +1,62 @@
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { createConnection } from "node:net";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const envPath = join(root, ".env.local");
+const pidFile = join(root, ".tunnel.pid");
 
 if (!existsSync(envPath)) {
   console.log("[tunnel] .env.local not found, skipping.");
   process.exit(0);
 }
 
+// Parse .env.local: handle quoted values and strip inline comments
 const env = {};
 for (const line of readFileSync(envPath, "utf8").split("\n")) {
-  const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)/);
-  if (m) env[m[1]] = m[2].trim();
+  const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+  if (!m) continue;
+  let val = m[2].trim();
+  if (val.startsWith('"') || val.startsWith("'")) {
+    const q = val[0];
+    const end = val.indexOf(q, 1);
+    val = end !== -1 ? val.slice(1, end) : val.slice(1);
+  } else {
+    val = val.replace(/\s+#.*$/, "").trim();
+  }
+  env[m[1]] = val;
 }
 
 const { DB_SSH_USER, DB_SSH_PORT } = env;
 if (!DB_SSH_USER || !DB_SSH_PORT) {
-  console.log("[tunnel] DB_SSH_USER or DB_SSH_PORT not set, skipping.");
   process.exit(0);
 }
 
-// ポート 5432 が既に開いていれば二重起動をスキップ
+const localPort = Number(env.DB_TUNNEL_LOCAL_PORT ?? "5432");
+const remoteHost = env.DB_TUNNEL_REMOTE_HOST ?? "localhost";
+const remotePort = env.DB_TUNNEL_REMOTE_PORT ?? "5432";
+const keyPath =
+  env.DB_SSH_KEY_PATH ??
+  join(process.env.USERPROFILE ?? process.env.HOME ?? "", ".ssh", "id_rsa");
+
+// PID ファイルが残っている場合: プロセスが生きていればスキップ、死んでいれば削除
+if (existsSync(pidFile)) {
+  const pid = Number(readFileSync(pidFile, "utf8").trim());
+  try {
+    process.kill(pid, 0); // プロセスが存在しなければ throws
+    console.log(`[tunnel] tunnel already running (pid ${pid}), skipping.`);
+    process.exit(0);
+  } catch {
+    // プロセスは既に終了 — stale PID ファイルを削除して続行
+    unlinkSync(pidFile);
+  }
+}
+
+// フォールバック: ポートが既に開いていれば（ローカル PostgreSQL 等）スキップ
 const alreadyOpen = await new Promise((resolve) => {
-  const s = createConnection({ port: 5432, host: "127.0.0.1" });
+  const s = createConnection({ port: localPort, host: "127.0.0.1" });
   s.on("connect", () => {
     s.destroy();
     resolve(true);
@@ -39,7 +69,7 @@ const alreadyOpen = await new Promise((resolve) => {
 });
 
 if (alreadyOpen) {
-  console.log("[tunnel] port 5432 already open, skipping.");
+  console.log(`[tunnel] port ${localPort} already open (local DB?), skipping.`);
   process.exit(0);
 }
 
@@ -48,11 +78,6 @@ const sshCandidates = [
   "/usr/bin/ssh",
 ];
 const sshExe = sshCandidates.find((p) => existsSync(p)) ?? "ssh";
-const keyPath = join(
-  process.env.USERPROFILE ?? process.env.HOME,
-  ".ssh",
-  "id_rsa",
-);
 
 console.log(`[tunnel] starting ${DB_SSH_USER} port ${DB_SSH_PORT}...`);
 
@@ -65,7 +90,7 @@ const child = spawn(
     DB_SSH_PORT,
     "-N",
     "-L",
-    "5432:localhost:5432",
+    `${localPort}:${remoteHost}:${remotePort}`,
     DB_SSH_USER,
   ],
   { detached: true, stdio: ["ignore", "ignore", "pipe"] },
@@ -86,6 +111,7 @@ try {
   process.exit(1);
 }
 
+writeFileSync(pidFile, String(child.pid));
 child.stderr.destroy();
 child.unref();
 console.log("[tunnel] ready.");

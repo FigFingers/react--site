@@ -79,13 +79,14 @@ Focus on API behavior, auth boundaries, and migration risk.
 3. Run the smallest meaningful validation gate before editing when setup risk is unclear.
 4. After edits, rerun the required gate for the task.
 5. Report changed behavior, validation status, and any remaining risks.
-6. If the work is ready to land, provide commit/push/PR commands for the user to run instead of executing them.
+6. If the work is ready to land, provide commit, push, PR creation, or merge commands for the user to run instead of executing them.
 
 ## Git Operation Policy
 
 - Codex may run read-only git commands such as `git status`, `git diff`, `git log`, and `git show`.
-- Codex must not run `git add`, `git commit`, `git push`, `git tag`, `gh pr create`, `gh pr merge`, or equivalent commands that create history, update remotes, or publish review artifacts.
-- This rule applies even when the user asks for those operations. The standard behavior is to print the commands only.
+- Codex must not run `git add`, `git commit`, `git push`, `git tag`, `gh pr create`, `gh pr merge`, or equivalent commands that create history, update remotes, create PRs, or merge PRs.
+- Codex may run `gh pr view`, `gh pr diff`, `gh pr review`, and `gh pr comment` only when the user explicitly asks for PR inspection, review submission, or commenting.
+- Commit, push, PR creation, and merge remain print-only even when requested. The standard behavior is to print the commands for the user to run manually.
 
 ## Handoff Format
 

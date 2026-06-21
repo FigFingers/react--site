@@ -36,7 +36,7 @@ Use the Codex harness scripts to keep AI-driven changes inside a repeatable vali
 - `npm run codex:full`
   - runs all of the above plus `npm run build`
 
-Codex may inspect git state, but it does not run commit, push, tag, or PR publication commands. When those steps are needed, it prints suggested commands for you to run manually.
+Codex may inspect git state and can submit PR reviews or comments when explicitly requested, but it does not run commit, push, tag, PR creation, or merge commands. When those steps are needed, it prints suggested commands for you to run manually.
 
 Repository-specific Codex guidance lives in [AGENTS.md](/home/hiiro/repos/FigFingers/react--site/AGENTS.md:1) and the operational workflow is documented in [docs/ai-development.md](/home/hiiro/repos/FigFingers/react--site/docs/ai-development.md:1).
 

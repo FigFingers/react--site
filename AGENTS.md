@@ -14,8 +14,9 @@
 - Never log secrets or copy values from `.env.local`.
 - Do not perform destructive git or database operations unless the user explicitly asked for them.
 - Git read-only commands such as `git status`, `git diff`, `git log`, and `git show` are allowed.
-- Do not run history or remote-affecting commands such as `git add`, `git commit`, `git push`, `git tag`, `gh pr create`, `gh pr merge`, or similar release/publication commands.
-- When commit, push, or PR steps are needed, provide the exact commands for the user to run instead of executing them.
+- Do not run history, branch, or PR lifecycle commands such as `git add`, `git commit`, `git push`, `git tag`, `gh pr create`, or `gh pr merge`.
+- `gh pr view`, `gh pr diff`, `gh pr review`, and `gh pr comment` are allowed only when the user explicitly asks for PR inspection, review submission, or commenting.
+- When commit, push, PR creation, or merge steps are needed, provide the exact commands for the user to run instead of executing them.
 
 ## Validation
 
@@ -41,6 +42,6 @@
 ## Delivery Format
 
 - For implementation tasks, finish with the exact commands you ran and whether they passed.
-- When handoff requires a commit, push, or PR, include suggested commands and a suggested commit message, but do not execute them.
+- When handoff requires a commit, push, PR creation, or merge, include suggested commands and a suggested commit message, but do not execute them.
 - For review tasks, lead with concrete findings, file references, and missing tests.
 - If a task is blocked by DB connectivity, state whether `codex:quick` and `codex:schema` still pass.

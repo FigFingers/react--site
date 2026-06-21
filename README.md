@@ -23,6 +23,23 @@ Next.js App Router application for FigFingers. The current branch uses a Prisma/
 3. Start the app.
    `npm run dev`
 
+## Codex Workflow
+
+Use the Codex harness scripts to keep AI-driven changes inside a repeatable validation flow:
+
+- `npm run codex:quick`
+  - checks Node 24.x, lint, unit tests, and TypeScript
+- `npm run codex:schema`
+  - validates Prisma schema and runs `prisma-augment` in check mode
+- `npm run codex:db`
+  - verifies `.env.local`, starts the SSH tunnel when `DB_SSH_USER` and `DB_SSH_PORT` are set, and runs `prisma migrate status`
+- `npm run codex:full`
+  - runs all of the above plus `npm run build`
+
+Codex may inspect git state, but it does not run commit, push, tag, or PR publication commands. When those steps are needed, it prints suggested commands for you to run manually.
+
+Repository-specific Codex guidance lives in [AGENTS.md](/home/hiiro/repos/FigFingers/react--site/AGENTS.md:1) and the operational workflow is documented in [docs/ai-development.md](/home/hiiro/repos/FigFingers/react--site/docs/ai-development.md:1).
+
 ## Database
 
 This repo expects PostgreSQL. The current migration history has been rebuilt into a single init migration:

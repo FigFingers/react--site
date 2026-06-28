@@ -23,39 +23,22 @@ Next.js App Router application for FigFingers. The current branch uses a Prisma/
 3. Start the app.
    `npm run dev`
 
-## 開発コマンドと SSH トンネル
+## Codex Workflow
 
-`npm run dev` は起動前に `scripts/start-tunnel.mjs` を実行し、SSH ポートフォワーディングでリモート PostgreSQL に接続する。
+Use the Codex harness scripts to keep AI-driven changes inside a repeatable validation flow:
 
-```
-npm run dev      # SSHトンネル → lint → next dev（リモートDB用）
-npm run dev:local  # next dev のみ（ローカルDB用）
-```
+- `npm run codex:quick`
+  - checks Node 24.x, lint, unit tests, and TypeScript
+- `npm run codex:schema`
+  - validates Prisma schema and runs `prisma-augment` in check mode
+- `npm run codex:db`
+  - verifies `.env.local`, starts the SSH tunnel when `DB_SSH_USER` and `DB_SSH_PORT` are set, and runs `prisma migrate status`
+- `npm run codex:full`
+  - runs all of the above plus `npm run build`
 
-### ローカル DB を使う場合
+Codex may inspect git state and can submit PR reviews or comments when explicitly requested, but it does not run commit, push, tag, PR creation, or merge commands. When those steps are needed, it prints suggested commands for you to run manually.
 
-`npm run dev:local` を使う。トンネルスクリプトを完全にスキップする。
-
-### `npm run dev` 実行時のトンネル起動判定
-
-| 状況 | 動作 |
-|---|---|
-| `.env.local` がない | スキップして正常起動 |
-| `DB_SSH_USER` / `DB_SSH_PORT` が未設定 | スキップして正常起動 |
-| 対象ポート（デフォルト 5432）が既に開いている | スキップして正常起動（ローカル DB と判断） |
-| SSH 接続が 2 秒以内に切れる | エラーで `dev` 起動失敗 |
-| SSH 接続成功（2 秒以上維持） | トンネル確立、バックグラウンドで継続 |
-
-`.env.local` で設定する SSH 関連の変数：
-
-```
-DB_SSH_USER=user@hostname
-DB_SSH_PORT=22
-DB_TUNNEL_LOCAL_PORT=5432    # 省略時 5432
-DB_TUNNEL_REMOTE_HOST=localhost  # 省略時 localhost
-DB_TUNNEL_REMOTE_PORT=5432   # 省略時 5432
-DB_SSH_KEY_PATH=~/.ssh/id_rsa  # 省略時 ~/.ssh/id_rsa
-```
+Repository-specific Codex guidance lives in [AGENTS.md](/home/hiiro/repos/FigFingers/react--site/AGENTS.md:1) and the operational workflow is documented in [docs/ai-development.md](/home/hiiro/repos/FigFingers/react--site/docs/ai-development.md:1).
 
 ## Database
 

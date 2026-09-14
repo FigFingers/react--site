@@ -6,6 +6,16 @@ export function findById(id: number) {
   return prisma.clip.findFirst({ where: { id, deletedAt: null } });
 }
 
+export function findActiveOwnerById(
+  id: number,
+  db: Prisma.TransactionClient = prisma,
+) {
+  return db.clip.findFirst({
+    where: { id, deletedAt: null },
+    select: { userId: true },
+  });
+}
+
 export function findByIdWithVod(id: number) {
   return prisma.clip.findFirst({
     where: { id, deletedAt: null },
@@ -117,16 +127,51 @@ export function update(
     url?: string;
     epnum?: string | null;
   },
+  db: Prisma.TransactionClient = prisma,
 ) {
-  return prisma.clip.update({ where: { id }, data });
+  return db.clip.update({ where: { id }, data });
 }
 
-export function softDelete(id: number) {
-  return prisma.clip.update({ where: { id }, data: { deletedAt: new Date() } });
+export async function lockActiveById(id: number, db: Prisma.TransactionClient) {
+  const rows = await db.$queryRaw<
+    Array<{ id: bigint; userId: bigint; startMs: number; endMs: number }>
+  >`
+    SELECT
+      id,
+      user_id AS "userId",
+      start_ms AS "startMs",
+      end_ms AS "endMs"
+    FROM clips
+    WHERE id = ${BigInt(id)}
+      AND deleted_at IS NULL
+    FOR UPDATE
+  `;
+
+  return rows[0] ?? null;
 }
 
-export function hardDelete(id: number) {
-  return prisma.clip.delete({ where: { id } });
+export function countActiveAnchorsOutsideRange(
+  clipId: number,
+  startMs: number,
+  endMs: number,
+  db: Prisma.TransactionClient,
+) {
+  return db.clipComment.count({
+    where: {
+      clipId: BigInt(clipId),
+      deletedAt: null,
+      atMs: { not: null },
+      OR: [{ atMs: { lt: startMs } }, { atMs: { gt: endMs } }],
+    },
+  });
+}
+
+export function softDelete(id: number, db: Prisma.TransactionClient = prisma) {
+  return db.clip.update({ where: { id }, data: { deletedAt: new Date() } });
+}
+
+export function hardDelete(id: number, db: Prisma.TransactionClient = prisma) {
+  return db.clip.delete({ where: { id } });
 }
 
 export function incrementViews(id: number, by: bigint = 1n) {

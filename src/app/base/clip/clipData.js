@@ -48,13 +48,14 @@ function Clip({
       url,
       starttime,
       endtime,
+      id: Number(Id),
     };
     if (openClipPlayback(clip)) {
-      recordRecentClip({ ...clip, id: Number(Id) });
+      recordRecentClip(clip);
     } else {
       alert(
         // biome-ignore lint/security/noSecrets: Japanese UI label is a false positive.
-        "このクリップの再生リンクを開けませんでした（未対応のサービスです）",
+        "このクリップの再生リンクを開けませんでした。未対応のサービスか、ブラウザでポップアップがブロックされています。",
       );
     }
   };

@@ -2,6 +2,7 @@
 "use client";
 
 import { useState } from "react";
+import CommentModal from "@/app/base/_components/CommentModal";
 import PlaylistCreateModal from "@/app/base/_components/PlaylistModal";
 import {
   buildServiceUrl,
@@ -28,6 +29,7 @@ function Clip({
   starttime,
   endtime,
   userId,
+  ownerId,
   Id,
 }) {
   const playable = buildServiceUrl(icon, url) !== null;
@@ -35,6 +37,7 @@ function Clip({
   const timeRange = formatTimeRange(starttime, endtime);
 
   const [isOpen, setIsOpen] = useState(false);
+  const [isCommentOpen, setIsCommentOpen] = useState(false);
 
   const handleClick = () => {
     const clip = {
@@ -98,6 +101,15 @@ function Clip({
         </button>
         <button
           type="button"
+          onClick={() => setIsCommentOpen(true)}
+          className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border-2 border-ink bg-white text-[13px] font-extrabold hover:bg-chip"
+          title="コメントを見る"
+          aria-label="コメントを見る"
+        >
+          💬
+        </button>
+        <button
+          type="button"
           onClick={() => setIsOpen(true)}
           className="grid h-8 w-8 shrink-0 cursor-pointer place-items-center rounded-full border-2 border-ink bg-white text-[15px] font-extrabold hover:bg-chip"
           title="プレイリストに追加"
@@ -112,6 +124,14 @@ function Clip({
         onClose={() => setIsOpen(false)}
         userId={userId}
         clipId={Id}
+      />
+
+      <CommentModal
+        isOpen={isCommentOpen}
+        onClose={() => setIsCommentOpen(false)}
+        clipId={Id}
+        userId={userId}
+        clipOwnerId={ownerId}
       />
     </article>
   );

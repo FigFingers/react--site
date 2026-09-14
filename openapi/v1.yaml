@@ -1916,6 +1916,12 @@ paths:
                 $ref: "#/components/schemas/Clip"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The requested clip range would exclude an active comment anchor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       operationId: clips.delete
       x-permission: ownerOrAdmin

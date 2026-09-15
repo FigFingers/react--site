@@ -78,7 +78,7 @@ function calls(fixture) {
   return fixture.read("calls.jsonl").trim().split("\n").map(JSON.parse);
 }
 
-test("quick runs installed CLIs and nested tests without npm/npx or PATH", (t) => {
+test("quick runs installed CLIs and nested tests with tsx, as npm test does, without npm/npx or PATH", (t) => {
   const fixture = harnessFixture(t);
   const result = run(fixture, "quick");
   assert.equal(result.status, 0, result.stdout + result.stderr);

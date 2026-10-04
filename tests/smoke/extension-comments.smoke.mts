@@ -36,6 +36,7 @@ const authHash = createHash("sha256").update(token).digest("hex");
 let linkedId: bigint | null = null;
 let fixtureClipId: bigint | null = null;
 let fixtureUserId: bigint | null = null;
+let fixtureVodId: number | null = null;
 const createdCommentIds: bigint[] = [];
 
 async function cleanupStep(label: string, operation: () => Promise<void>) {
@@ -65,11 +66,16 @@ async function req(path: string, init: RequestInit = {}) {
 }
 
 try {
-  const vod = await prisma.vod.findFirstOrThrow({
-    where: { deletedAt: null },
+  // 既存の VOD に頼らない（空の DB でも準備で落ちないように）。後始末で消す。
+  const vodNonce = randomUUID();
+  const vod = await prisma.vod.create({
+    data: {
+      code: `smoke-${vodNonce}`,
+      name: `Extension comments smoke ${vodNonce}`,
+    },
     select: { id: true },
-    orderBy: { id: "asc" },
   });
+  fixtureVodId = vod.id;
   const fixtureUser = await prisma.user.create({
     data: {
       name: "extension-comment-smoke-user",
@@ -403,6 +409,13 @@ try {
     await cleanupStep("専用ユーザーの物理削除", async () => {
       await prisma.user.delete({ where: { id } });
       console.log(`  専用ユーザーを物理削除: ${id}`);
+    });
+  }
+  if (fixtureVodId != null) {
+    const id = fixtureVodId;
+    await cleanupStep("専用VODの物理削除", async () => {
+      await prisma.vod.delete({ where: { id } });
+      console.log(`  専用VODを物理削除: ${id}`);
     });
   }
   await cleanupStep("Prisma切断", () => prisma.$disconnect());

@@ -73,16 +73,22 @@ let deletedClipId: number | null = null;
 let fixtureClipId: bigint | null = null;
 let orphanedClipId: bigint | null = null;
 const createdUserIds: bigint[] = [];
+let fixtureVodId: number | null = null;
 let ownerUserId: number;
 let otherUserId: number;
 let clipId: number;
 
 try {
-  const vod = await prisma.vod.findFirstOrThrow({
-    where: { deletedAt: null },
+  // 既存の VOD に頼らない（空の DB でも準備で落ちないように）。後始末で消す。
+  const vodNonce = crypto.randomUUID();
+  const vod = await prisma.vod.create({
+    data: {
+      code: `smoke-${vodNonce}`,
+      name: `Clip comments smoke ${vodNonce}`,
+    },
     select: { id: true },
-    orderBy: { id: "asc" },
   });
+  fixtureVodId = vod.id;
   const owner = await prisma.user.create({
     data: {
       name: "smoke-comment-owner",
@@ -1039,6 +1045,13 @@ try {
       await prisma.clipComment.deleteMany({ where: { userId: createdUserId } });
       await prisma.user.delete({ where: { id: createdUserId } });
       console.log(`  一時作成したユーザーを物理削除: ${createdUserId}`);
+    });
+  }
+  if (fixtureVodId != null) {
+    const id = fixtureVodId;
+    await cleanupStep("専用VODの物理削除", async () => {
+      await prisma.vod.delete({ where: { id } });
+      console.log(`  専用VODを物理削除: ${id}`);
     });
   }
   await cleanupStep("Prisma切断", () => prisma.$disconnect());

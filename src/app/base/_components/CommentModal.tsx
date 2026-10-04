@@ -56,6 +56,30 @@ function formatAtMs(atMs: number): string {
   return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
+const SUBMIT_ERROR_MESSAGES_BY_CODE: Record<string, string> = {
+  // 同じ再送キーの投稿は処理済みで、その後削除されている。
+  IDEMPOTENCY_KEY_REUSED:
+    "前回の送信はすでに処理されていました（その後削除されています）。もう一度送ると新しいコメントとして投稿します。",
+  CLIP_OWNER_RETIRED:
+    "このクリップの投稿者が退会しているため、新しいコメントは書けません。",
+};
+
+const SUBMIT_ERROR_MESSAGES_BY_STATUS: Record<number, string> = {
+  401: "コメントするにはログインが必要です。",
+  404: "このクリップは削除されています。",
+  429: "投稿が続いています。1分ほど待ってからお試しください。",
+};
+
+function submitErrorMessage(error: unknown): string {
+  if (error instanceof CommentApiError) {
+    const byCode = error.code && SUBMIT_ERROR_MESSAGES_BY_CODE[error.code];
+    if (byCode) return byCode;
+    const byStatus = SUBMIT_ERROR_MESSAGES_BY_STATUS[error.status];
+    if (byStatus) return byStatus;
+  }
+  return "コメントを投稿できませんでした。時間をおいて再度お試しください。";
+}
+
 export default function CommentModal({
   isOpen,
   onClose,
@@ -449,16 +473,15 @@ export default function CommentModal({
       }
     } catch (error) {
       if (!isRequestCurrent(generation)) return;
-      const status = error instanceof CommentApiError ? error.status : null;
-      const messages: Record<number, string> = {
-        401: "コメントするにはログインが必要です。",
-        404: "このクリップは削除されています。",
-        429: "投稿が続いています。1分ほど待ってからお試しください。",
-      };
-      setErrorMessage(
-        (status == null ? undefined : messages[status]) ??
-          "コメントを投稿できませんでした。時間をおいて再度お試しください。",
-      );
+      // このキーはもう同じ結果を返さない（元の投稿が削除済み）。持ち続けると、
+      // 本文を書き換えない限り何度押しても同じ 409 になる。
+      if (
+        error instanceof CommentApiError &&
+        error.code === "IDEMPOTENCY_KEY_REUSED"
+      ) {
+        submitRequestIdRef.current = null;
+      }
+      setErrorMessage(submitErrorMessage(error));
     } finally {
       if (isRequestCurrent(generation)) {
         submittingRef.current = false;

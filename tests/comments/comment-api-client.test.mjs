@@ -69,6 +69,34 @@ test("comment creation preserves the caller's retry key and returns the comment"
   }
 });
 
+test("comment creation failures keep the server's error code", async (t) => {
+  const responses = [
+    Response.json({ code: "IDEMPOTENCY_KEY_REUSED" }, { status: 409 }),
+    Response.json({ code: "CLIP_OWNER_RETIRED" }, { status: 409 }),
+    new Response("not json", { status: 409 }),
+  ];
+  t.mock.method(globalThis, "fetch", async () => responses.shift());
+  const create = () =>
+    createClipComment("12", { body: "hello", clientRequestId: "retry-key" });
+
+  for (const code of ["IDEMPOTENCY_KEY_REUSED", "CLIP_OWNER_RETIRED"]) {
+    await assert.rejects(
+      create,
+      (error) =>
+        error instanceof CommentApiError &&
+        error.status === 409 &&
+        error.code === code,
+    );
+  }
+  await assert.rejects(
+    create,
+    (error) =>
+      error instanceof CommentApiError &&
+      error.status === 409 &&
+      error.code === undefined,
+  );
+});
+
 test("only ALREADY_REPORTED conflicts count as completed reports", async (t) => {
   const responses = [
     Response.json({}, { status: 201 }),

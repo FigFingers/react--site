@@ -58,8 +58,20 @@ export async function createClipComment(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  if (!response.ok) throw new CommentApiError(response.status);
+  // 409 は理由で対処が変わる（再送キーの再利用 / 所有者の退会 / 一時的な競合）ので
+  // code も渡す。
+  if (!response.ok) {
+    throw new CommentApiError(response.status, await readErrorCode(response));
+  }
   return response.json();
+}
+
+/** エラー応答の code を読む。本文が空・JSON でない応答では undefined。 */
+async function readErrorCode(response: Response): Promise<string | undefined> {
+  const payload = (await response.json().catch(() => null)) as {
+    code?: unknown;
+  } | null;
+  return typeof payload?.code === "string" ? payload.code : undefined;
 }
 
 export async function deleteClipComment(clipId: string, commentId: number) {

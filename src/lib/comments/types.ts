@@ -9,7 +9,9 @@ export type ClipComment = {
   createdAt: string;
 };
 
-export type ReportReason = "spam" | "harassment" | "spoiler" | "other";
+import type { ReportReason } from "./reportReasons";
+
+export type { ReportReason };
 
 export type ReportSummary = {
   reportCount: number;

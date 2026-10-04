@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { CLIP_COMMENT_REPORT_REASONS } from "@/lib/comments/reportReasons";
 import {
   COMMENT_BODY_MAX_CODE_POINTS,
   isWithinUnicodeCodePointLimit,
@@ -47,13 +48,8 @@ export const clipCommentIdParamSchema = z.object({
   commentId: idSchema,
 });
 
-// DB は VarChar(32) の素の文字列なので、値の妥当性はここで担保する。
-export const CLIP_COMMENT_REPORT_REASONS = [
-  "spam",
-  "harassment",
-  "spoiler",
-  "other",
-] as const;
+// 理由の一覧は画面と共有するため zod を含まないモジュールに置いている。
+export { CLIP_COMMENT_REPORT_REASONS };
 
 export const clipCommentReportCreateBodySchema = z
   .object({

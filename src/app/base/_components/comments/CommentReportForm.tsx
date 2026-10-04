@@ -2,11 +2,14 @@
 "use client";
 
 import {
+  CLIP_COMMENT_REPORT_REASONS,
+  type ReportReason,
+} from "@/lib/comments/reportReasons";
+import {
   countUnicodeCodePoints,
   limitUnicodeCodePoints,
   REPORT_NOTE_MAX_CODE_POINTS,
 } from "@/lib/comments/text";
-import type { ReportReason } from "@/lib/comments/types";
 import { REPORT_REASON_LABELS } from "./reportReasons";
 
 type CommentReportFormProps = {
@@ -42,9 +45,9 @@ export default function CommentReportForm({
           }
           className="rounded-lg border-2 border-ink bg-white px-2 py-1.5"
         >
-          {Object.entries(REPORT_REASON_LABELS).map(([value, label]) => (
+          {CLIP_COMMENT_REPORT_REASONS.map((value) => (
             <option key={value} value={value}>
-              {label}
+              {REPORT_REASON_LABELS[value]}
             </option>
           ))}
         </select>

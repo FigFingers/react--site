@@ -90,6 +90,15 @@ test("re-reading the first report page keeps already loaded continuation pages",
   );
 });
 
+test("CommentModal asks for deletion inside the dialog, not with window.confirm", () => {
+  const source = readFileSync(
+    "src/app/base/_components/CommentModal.tsx",
+    "utf8",
+  );
+  assert.doesNotMatch(source, /window\.confirm|\bconfirm\(/);
+  assert.match(source, /<CommentDeleteConfirm/);
+});
+
 test("CommentModal keeps recovered comments visible and exposes list retry", () => {
   const source = readFileSync(
     "src/app/base/_components/CommentModal.tsx",

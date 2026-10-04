@@ -280,11 +280,57 @@ try {
     (await reloaded.getByRole("button", { name: /通報/ }).count()) === 0,
   );
 
-  // window.confirm は Playwright の既定で dismiss されるため明示的に承認する
-  page.on("dialog", (d: any) => d.accept());
-  await reloaded.getByRole("button", { name: /削除/ }).click();
+  // 削除の確認はネイティブの window.confirm ではなく、モーダル内の確認欄で行う。
+  // ネイティブのダイアログが出たらその時点で失敗として記録する。
+  let nativeDialogShown = false;
+  page.on("dialog", (d: any) => {
+    nativeDialogShown = true;
+    void d.dismiss();
+  });
+  const deleteButton = reloaded.getByRole("button", {
+    name: "自分のコメントを削除",
+  });
+  const confirmDelete = reloaded.getByRole("button", {
+    name: "削除する",
+    exact: true,
+  });
+  const cancelDelete = reloaded.getByRole("button", {
+    name: "キャンセル",
+    exact: true,
+  });
+  // フォーカスは DOM 更新後の requestAnimationFrame で移るので、少し待って判定する
+  const becomesFocused = async (locator: any) => {
+    try {
+      await page.waitForFunction(
+        (node: Element) => node === document.activeElement,
+        await locator.elementHandle(),
+        { timeout: 2000 },
+      );
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  await deleteButton.click();
+  await confirmDelete.waitFor({ state: "visible", timeout: 5000 });
+  check(
+    "削除ボタンでモーダル内に確認欄が出て、取り消し側にフォーカスが移る",
+    await becomesFocused(cancelDelete),
+  );
+  await cancelDelete.click();
+  await confirmDelete.waitFor({ state: "detached", timeout: 5000 });
+  check("キャンセルでは消えない", (await reloaded.count()) === 1);
+  check(
+    "キャンセルするとフォーカスが削除ボタンへ戻る",
+    await becomesFocused(deleteButton),
+  );
+
+  await deleteButton.click();
+  await confirmDelete.click();
   await reloaded.waitFor({ state: "detached", timeout: 15000 });
-  check("削除ボタンで一覧から消える", (await reloaded.count()) === 0);
+  check("確認欄で削除すると一覧から消える", (await reloaded.count()) === 0);
+  check("ネイティブの確認ダイアログは出ない", !nativeDialogShown);
 
   const remaining = await prisma.clipComment.findUnique({
     where: { id: createdComment.id },

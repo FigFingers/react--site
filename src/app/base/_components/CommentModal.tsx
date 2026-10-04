@@ -27,6 +27,7 @@ import type {
   ReportSummary,
 } from "@/lib/comments/types";
 import CommentComposer from "./comments/CommentComposer";
+import CommentDeleteConfirm from "./comments/CommentDeleteConfirm";
 import CommentReportForm from "./comments/CommentReportForm";
 import { REPORT_REASON_LABELS } from "./comments/reportReasons";
 import { useCommentDialogFocus } from "./comments/useCommentDialogFocus";
@@ -108,6 +109,8 @@ export default function CommentModal({
   const isOpenRef = useRef(isOpen);
   const commentArticleRefs = useRef(new Map<number, HTMLElement>());
   const reportButtonRefs = useRef(new Map<number, HTMLButtonElement>());
+  const deleteButtonRefs = useRef(new Map<number, HTMLButtonElement>());
+  const deleteCancelButtonRef = useRef<HTMLButtonElement>(null);
   const listRetryButtonRef = useRef<HTMLButtonElement>(null);
   const reportRetryButtonRef = useRef<HTMLButtonElement>(null);
   onCloseRef.current = onClose;
@@ -120,6 +123,9 @@ export default function CommentModal({
   const [body, setBody] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<number | null>(
+    null,
+  );
   const [errorMessage, setErrorMessage] = useState("");
   const [reportingId, setReportingId] = useState<number | null>(null);
   const [reportedIds, setReportedIds] = useState<number[]>([]);
@@ -283,6 +289,7 @@ export default function CommentModal({
     setLoadingMore(false);
     setSubmitting(false);
     setDeletingId(null);
+    setConfirmingDeleteId(null);
     setReportingId(null);
     setResolvingId(null);
     setReportedIds([]);
@@ -336,10 +343,29 @@ export default function CommentModal({
   };
 
   const beginReport = (comment: Comment) => {
+    setConfirmingDeleteId(null);
     setReportTarget(comment);
     setReportReason("other");
     setReportNote("");
     setErrorMessage("");
+  };
+
+  const beginDelete = (comment: Comment) => {
+    if (deletingId !== null) return;
+    const generation = requestGenerationRef.current;
+    setReportTarget(null);
+    setConfirmingDeleteId(comment.id);
+    setErrorMessage("");
+    // 破壊的な操作なので、確定ではなく取り消し側へフォーカスを置く。
+    focusAfterDomUpdate(generation, () => deleteCancelButtonRef.current);
+  };
+
+  const cancelDelete = (commentId: number) => {
+    const generation = requestGenerationRef.current;
+    setConfirmingDeleteId(null);
+    focusAfterDomUpdate(generation, () =>
+      deleteButtonRefs.current.get(commentId),
+    );
   };
 
   const cancelReport = (commentId: number) => {
@@ -413,13 +439,13 @@ export default function CommentModal({
 
   const remove = async (comment: Comment) => {
     if (deletingId !== null) return;
-    if (!window.confirm("このコメントを削除しますか？")) return;
     const generation = requestGenerationRef.current;
     if (!isRequestCurrent(generation)) return;
     const commentIndex = comments.findIndex((item) => item.id === comment.id);
     const nextFocusId =
       comments[commentIndex + 1]?.id ?? comments[commentIndex - 1]?.id ?? null;
 
+    setConfirmingDeleteId(null);
     setDeletingId(comment.id);
     setErrorMessage("");
     try {
@@ -609,9 +635,15 @@ export default function CommentModal({
                   </time>
                   {canDelete(comment) && (
                     <button
+                      ref={(node) => {
+                        if (node)
+                          deleteButtonRefs.current.set(comment.id, node);
+                        else deleteButtonRefs.current.delete(comment.id);
+                      }}
                       type="button"
-                      onClick={() => remove(comment)}
+                      onClick={() => beginDelete(comment)}
                       disabled={deletingId !== null}
+                      aria-expanded={confirmingDeleteId === comment.id}
                       className="shrink-0 cursor-pointer rounded-full border-2 border-ink bg-white px-2 py-0.5 text-[11px] font-extrabold hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label={
                         String(comment.userId) === viewerId
@@ -668,6 +700,13 @@ export default function CommentModal({
                         : "問題なしとして確認済みにする"}
                     </button>
                   </div>
+                )}
+                {confirmingDeleteId === comment.id && (
+                  <CommentDeleteConfirm
+                    cancelButtonRef={deleteCancelButtonRef}
+                    onCancel={() => cancelDelete(comment.id)}
+                    onConfirm={() => void remove(comment)}
+                  />
                 )}
                 {reportTarget?.id === comment.id && (
                   <CommentReportForm

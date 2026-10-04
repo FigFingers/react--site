@@ -22,3 +22,21 @@ export function upsertReportedCommentsById<T extends Identified>(
     reportRows.map((row) => row.comment),
   );
 }
+
+/**
+ * 通報サマリーの 1 ページを、表示中のサマリーに反映する。
+ *
+ * 続きのページは足し込む。先頭ページは、続きを読んでいなければ置き換える
+ * （開き直したときに古い表示を残さない）。続きを読み込み済みのときに先頭ページを
+ * 読み直す場合（通報した直後の更新）も足し込む。置き換えると、読み込み済みの
+ * 続きのページにあるバッジと「確認済みにする」ボタンが消える。
+ */
+export function mergeReportSummaryPage<T>(
+  current: Readonly<Record<number, T>>,
+  page: Readonly<Record<number, T>>,
+  options: { isContinuation: boolean; hasLoadedContinuation: boolean },
+): Record<number, T> {
+  return options.isContinuation || options.hasLoadedContinuation
+    ? { ...current, ...page }
+    : { ...page };
+}

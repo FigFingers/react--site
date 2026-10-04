@@ -12,6 +12,7 @@ import {
   reportClipComment,
 } from "@/lib/comments/client";
 import {
+  mergeReportSummaryPage,
   upsertCommentsById,
   upsertReportedCommentsById,
 } from "@/lib/comments/collections";
@@ -102,6 +103,8 @@ export default function CommentModal({
   const bodyRevisionRef = useRef(0);
   const requestGenerationRef = useRef(0);
   const reportLoadRequestRef = useRef(0);
+  /** 「古い通報情報も読み込む」で続きのページを読んだか。 */
+  const loadedMoreReportsRef = useRef(false);
   const isOpenRef = useRef(isOpen);
   const commentArticleRefs = useRef(new Map<number, HTMLElement>());
   const reportButtonRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -240,10 +243,20 @@ export default function CommentModal({
           };
         }
         setComments((previous) => upsertReportedCommentsById(previous, rows));
+        const isContinuation = cursor != null;
+        const hasLoadedContinuation = loadedMoreReportsRef.current;
+        if (isContinuation) loadedMoreReportsRef.current = true;
         setReportSummaries((previous) =>
-          cursor ? { ...previous, ...summaries } : summaries,
+          mergeReportSummaryPage(previous, summaries, {
+            isContinuation,
+            hasLoadedContinuation,
+          }),
         );
-        setReportNextCursor(page.nextCursor);
+        // 続きを読み込み済みのときの先頭ページの読み直しでは、カーソルを先頭ページの
+        // 続きへ巻き戻さない。巻き戻すと読み込み済みのページをもう一度取りに行く。
+        if (isContinuation || !hasLoadedContinuation) {
+          setReportNextCursor(page.nextCursor);
+        }
         setReportLoadError(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError")
@@ -280,6 +293,7 @@ export default function CommentModal({
     setReportNextCursor(null);
     setReportLoadError(null);
     setLoadingReports(false);
+    loadedMoreReportsRef.current = false;
     void loadFirstPage(controller.signal, generation);
     void loadReportSummaries(controller.signal, null, generation);
     return () => {

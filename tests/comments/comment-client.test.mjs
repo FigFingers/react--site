@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const { upsertCommentsById, upsertReportedCommentsById } = await import(
-  "../../src/lib/comments/collections.ts"
-);
+const {
+  mergeReportSummaryPage,
+  upsertCommentsById,
+  upsertReportedCommentsById,
+} = await import("../../src/lib/comments/collections.ts");
 const {
   COMMENT_BODY_MAX_CODE_POINTS,
   REPORT_NOTE_MAX_CODE_POINTS,
@@ -52,6 +54,40 @@ test("reported comments are merged into the visible id-descending list", () => {
     { id: 5, body: "reported beyond the first page" },
   ]);
   assert.deepEqual(upsertCommentsById([], current), current);
+});
+
+test("re-reading the first report page keeps already loaded continuation pages", () => {
+  const loaded = { 30: "page 1 (old count)", 5: "page 2" };
+  const firstPage = { 30: "page 1 (new count)", 25: "newly reported" };
+
+  // 開いた直後・続きを読む前の読み直しは置き換える（古い表示を残さない）
+  assert.deepEqual(
+    mergeReportSummaryPage(loaded, firstPage, {
+      isContinuation: false,
+      hasLoadedContinuation: false,
+    }),
+    firstPage,
+  );
+  // 続きを読んだ後の読み直し（通報直後の更新）は、続きのページを消さない
+  assert.deepEqual(
+    mergeReportSummaryPage(loaded, firstPage, {
+      isContinuation: false,
+      hasLoadedContinuation: true,
+    }),
+    { 30: "page 1 (new count)", 25: "newly reported", 5: "page 2" },
+  );
+  // 続きのページは足し込む
+  assert.deepEqual(
+    mergeReportSummaryPage(
+      firstPage,
+      { 5: "page 2" },
+      {
+        isContinuation: true,
+        hasLoadedContinuation: false,
+      },
+    ),
+    { 30: "page 1 (new count)", 25: "newly reported", 5: "page 2" },
+  );
 });
 
 test("CommentModal keeps recovered comments visible and exposes list retry", () => {

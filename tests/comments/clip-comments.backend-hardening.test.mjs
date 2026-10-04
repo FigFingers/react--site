@@ -2,7 +2,7 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { assertAppearsInOrder, sourceSection } from "../helpers/source.mjs";
@@ -36,10 +36,16 @@ test("retryable Prisma transaction conflicts map to HTTP 409", () => {
 });
 
 /**
- * 適用済みマイグレーションの本文を固定する。Prisma は `_prisma_migrations.checksum`
- * と照合するので、適用後に本文を書き換えると他環境の `migrate deploy` が失敗する。
+ * 適用済みマイグレーションの本文を固定する。値は本番 DB の `_prisma_migrations.checksum`
+ * （= migration.sql の sha256）。適用後に本文を書き換えると、その環境の `migrate dev` が
+ * checksum 不一致で reset を要求する。`migrate deploy` / `migrate status` は checksum だけの
+ * 不一致を報告しないので、ずれたまま気付かずに進む（Prisma 7.4.0）。
  */
 const APPLIED_MIGRATION_CHECKSUMS = [
+  [
+    "20260430010000_init",
+    "8c5249c6a3221f6c1a168fdd87848b712c79127e6aef67b3143689dfa147b15a",
+  ],
   [
     "20260705000000_add_linked_extension_expires_at",
     "46de0e942185012899f6111dfb9e8df2ae1a2ee4f00f1fd643e6106894758b2f",
@@ -47,6 +53,10 @@ const APPLIED_MIGRATION_CHECKSUMS = [
   [
     "20260726000000_add_clip_comments",
     "d0fe6206ad65f859cd646702b084b44ac44e872fd5e81c7155c9f0225a381c07",
+  ],
+  [
+    "20260806000000_add_clip_comment_at_ms",
+    "e6ee0ebd061d0fb4ac15989d66ad2e353e2cd3c45f036aa1a69a89428f13617e",
   ],
   [
     "20260806010000_add_clip_comment_reports",
@@ -58,15 +68,45 @@ const APPLIED_MIGRATION_CHECKSUMS = [
     "20260809000000_harden_clip_comments",
     "82d8a2473580425df2308858cb85f521409ce90640e27c92d1c3001a1f18b7ec",
   ],
+  // ブランチのマージより先に本番へ適用された（2026-09-05）。
+  [
+    "20260905000000_playlist_clip_order",
+    "7f3109de9a47fc93430f76d51dc83507050ec3a6104d29dd16a385c1c5ea7f24",
+  ],
 ];
 
-test("already-applied feature migrations retain their recorded checksums", () => {
+/**
+ * まだどの共有 DB にも適用していないマイグレーション。新しく足したものはまずここに
+ * 入れ、適用したら本番の checksum とともに APPLIED_MIGRATION_CHECKSUMS へ移す。
+ */
+const PENDING_MIGRATIONS = [];
+
+test("already-applied migrations retain their recorded checksums", () => {
   for (const [name, expected] of APPLIED_MIGRATION_CHECKSUMS) {
     assert.equal(
       sha256File(`prisma/migrations/${name}/migration.sql`),
       expected,
-      `${name} は適用済みマイグレーション。本文を編集すると他環境の migrate deploy が` +
-        ` checksum 不一致で失敗する。変更を取り消すか、新しいマイグレーションを追加すること。`,
+      `${name} は適用済みマイグレーション。本文を編集すると適用済み環境と checksum が` +
+        `ずれる。変更を取り消し、必要な DDL は新しいマイグレーションに書くこと。`,
+    );
+  }
+});
+
+test("every migration is classified as applied or pending", () => {
+  const classified = new Set([
+    ...APPLIED_MIGRATION_CHECKSUMS.map(([name]) => name),
+    ...PENDING_MIGRATIONS,
+  ]);
+  const directories = readdirSync("prisma/migrations", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+  for (const name of directories) {
+    assert.ok(
+      classified.has(name),
+      `${name} が適用済みとも未適用とも分類されていない。共有 DB の _prisma_migrations を` +
+        `確認し、適用済みなら checksum を APPLIED_MIGRATION_CHECKSUMS に、未適用なら` +
+        `名前を PENDING_MIGRATIONS に足すこと。`,
     );
   }
 });
@@ -136,7 +176,7 @@ test("comment migrations keep Prisma defaults and cascade indexes aligned", () =
   );
 });
 
-test("pending hardening migration repairs the linked-extension expiry default", () => {
+test("hardening migration repairs the linked-extension expiry default", () => {
   const schema = readFileSync("prisma/schema.prisma", "utf8");
   const hardeningMigration = readFileSync(
     "prisma/migrations/20260809000000_harden_clip_comments/migration.sql",

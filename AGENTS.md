@@ -145,7 +145,10 @@ none of it, and neither does a fresh agent session on another machine.
   do not substitute the shared database for development or run a reset to unblock the work.
 - Deployment to shared/staging/production databases uses reviewed, committed migrations with
   `npx prisma migrate deploy` only when that deployment is in the user's authorized scope.
-  Run `npx prisma generate` for the application build and check migration status after deployment.
+  Run `npx prisma generate` for the application build and run `npm run codex:db` against the
+  deployed database afterwards. Once it reports the new migration as matching, add its name and
+  checksum to `tests/db/applied-migrations.test.mjs` so CI, which has no database, also rejects
+  later edits to that file.
 - If Prisma tries to generate follow-up diff noise around partial indexes, stop and inspect before proceeding.
 - シャドウDB は履歴を空の Postgres へ先頭から再生する。`20260430010000_init`
   より前に何かを挿すと再生が止まり、`migrate dev` が使えなくなる。

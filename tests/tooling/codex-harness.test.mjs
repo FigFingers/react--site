@@ -34,10 +34,22 @@ if (process.env.HARNESS_FAIL_CLI === ${JSON.stringify(bin)}) process.exit(17);
     );
   }
   fixture.write(
+    "node_modules/tsx/package.json",
+    JSON.stringify({ name: "tsx", type: "module", exports: "./index.mjs" }),
+  );
+  fixture.write(
+    "node_modules/tsx/index.mjs",
+    "globalThis.__fixtureTsxLoaded = true;\n",
+  );
+  fixture.write(
     "tests/nested/probe.test.mjs",
-    `import { appendFileSync } from "node:fs";
+    `import assert from "node:assert/strict";
+import { appendFileSync } from "node:fs";
 import test from "node:test";
-test("fixture test", () => appendFileSync("calls.jsonl", '["tests"]\\n'));
+test("fixture test", () => {
+  assert.equal(globalThis.__fixtureTsxLoaded, true);
+  appendFileSync("calls.jsonl", '["tests"]\\n');
+});
 `,
   );
   return fixture;
@@ -66,10 +78,17 @@ function calls(fixture) {
   return fixture.read("calls.jsonl").trim().split("\n").map(JSON.parse);
 }
 
-test("quick runs installed CLIs and nested tests without npm/npx or PATH", (t) => {
+test("quick runs installed CLIs and nested tests with tsx, as npm test does, without npm/npx or PATH", (t) => {
   const fixture = harnessFixture(t);
   const result = run(fixture, "quick");
   assert.equal(result.status, 0, result.stdout + result.stderr);
+  const testCommand = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  ).scripts.test.replaceAll('"', "");
+  assert.ok(
+    result.stdout.includes(`[codex] > ${testCommand}\n`),
+    result.stdout,
+  );
   assert.deepEqual(calls(fixture), [
     ["prisma", "generate"],
     ["next", "typegen"],

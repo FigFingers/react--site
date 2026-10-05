@@ -105,7 +105,7 @@ function runQuick() {
   runCli("@biomejs/biome", "biome", ["check", "."]);
 
   logStep("quick: tests");
-  runNode(["--test", "tests/**/*.test.mjs"]);
+  runNode(["--import", "tsx", "--test", "tests/**/*.test.mjs"]);
 
   logStep("quick: typecheck");
   runCli("typescript", "tsc", [
@@ -149,6 +149,12 @@ function runDb() {
 
   logStep("db: prisma migrate status");
   runCli("prisma", "prisma", ["migrate", "status"], {
+    env: { ...process.env, ...localEnv },
+  });
+
+  // migrate status は適用済みファイルの書き換え（checksum だけの不一致）を報告しない。
+  logStep("db: applied migration checksums");
+  runNode(["scripts/check-migration-checksums.mjs"], {
     env: { ...process.env, ...localEnv },
   });
 }

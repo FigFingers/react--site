@@ -151,6 +151,12 @@ function runDb() {
   runCli("prisma", "prisma", ["migrate", "status"], {
     env: { ...process.env, ...localEnv },
   });
+
+  // migrate status は適用済みファイルの書き換え（checksum だけの不一致）を報告しない。
+  logStep("db: applied migration checksums");
+  runNode(["scripts/check-migration-checksums.mjs"], {
+    env: { ...process.env, ...localEnv },
+  });
 }
 
 function runFull() {

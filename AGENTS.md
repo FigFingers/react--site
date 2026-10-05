@@ -107,7 +107,10 @@ none of it, and neither does a fresh agent session on another machine.
   This does not replay SQL, check applied-file checksums, or verify the live DB schema.
   Review raw-SQL removal warnings and any hand-written inverse SQL separately.
 - For DB-backed behavior changes, also run `npm run codex:db`: configuration, optional
-  SSH tunnel, and migration status. This is a connectivity/history check, not a behavior test.
+  SSH tunnel, migration status, and a comparison of `_prisma_migrations` checksums with the
+  local `migration.sql` files (read-only). It fails when an applied migration's file differs
+  from what was recorded and warns about migrations recorded only in the database.
+  This is a connectivity/history check, not a behavior test.
 - For auth, authorization, extension-token lifecycle, migration SQL/generation, or destructive
   data behavior changes, run `npm run codex:full` (quick + schema + db + production build).
   A successful full run covers the individual gates; do not repeat them without a reason.
@@ -150,7 +153,9 @@ none of it, and neither does a fresh agent session on another machine.
 - 適用済みの migration ファイルは編集しない。Prisma 7.4.0 ではチェックサム不一致を
   検出して reset を要求するのは `migrate dev` であり、`migrate status` /
   `migrate deploy` はチェックサムだけの不一致を報告しない。相当の DDL は未適用の
-  migration へ集約する。
+  migration へ集約する。この不一致は `npm run codex:db` が `_prisma_migrations` と
+  突き合わせて検出する。「未適用のはず」という前提は、コミットメッセージや PR 本文
+  ではなく codex:db の出力で確かめる。
 
 ## Delivery Format
 

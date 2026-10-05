@@ -136,7 +136,9 @@ none of it, and neither does a fresh agent session on another machine.
      Confirm its migration is unapplied before writing: augment selects the latest file and
      does not query the database to protect applied migrations.
   4. Run `node --import tsx scripts/prisma-augment.ts`
-  5. Review `prisma/migrations/<timestamp>_<name>/migration.sql`, then run `npm run codex:schema`
+  5. Review `prisma/migrations/<timestamp>_<name>/migration.sql`, add the directory name to
+     `PENDING_MIGRATIONS` in `scripts/lib/migration-registry.mjs` (CI fails on an unrecorded
+     migration), then run `npm run codex:schema`
   6. Apply to the dedicated development database with `npx prisma migrate dev`
   7. Regenerate Prisma Client with `npx prisma generate` (Prisma 7 does not do this automatically),
      then run the required validation gates.
@@ -146,9 +148,10 @@ none of it, and neither does a fresh agent session on another machine.
 - Deployment to shared/staging/production databases uses reviewed, committed migrations with
   `npx prisma migrate deploy` only when that deployment is in the user's authorized scope.
   Run `npx prisma generate` for the application build and run `npm run codex:db` against the
-  deployed database afterwards. Once it reports the new migration as matching, add its name and
-  checksum to `tests/db/applied-migrations.test.mjs` so CI, which has no database, also rejects
-  later edits to that file.
+  deployed database afterwards. It warns that the new migration is recorded as pending but
+  applied, and prints its checksum: move the entry from `PENDING_MIGRATIONS` to
+  `APPLIED_MIGRATIONS` in `scripts/lib/migration-registry.mjs` with that checksum, so CI, which
+  has no database, also rejects later edits to that file.
 - If Prisma tries to generate follow-up diff noise around partial indexes, stop and inspect before proceeding.
 - シャドウDB は履歴を空の Postgres へ先頭から再生する。`20260430010000_init`
   より前に何かを挿すと再生が止まり、`migrate dev` が使えなくなる。

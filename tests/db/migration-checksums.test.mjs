@@ -5,6 +5,7 @@ import { test } from "node:test";
 
 import {
   compareMigrationChecksums,
+  compareWithRegistry,
   localMigrationChecksums,
 } from "../../scripts/lib/migration-checksums.mjs";
 
@@ -87,4 +88,28 @@ test("local checksums are the sha256 of each migration.sql, as Prisma records th
   );
   // migration_lock.toml のようなファイルは対象にしない
   assert.ok([...checksums.keys()].every((key) => /^\d{14}_/.test(key)));
+});
+
+test("a migration recorded as pending but applied in the DB is reported with its checksum", () => {
+  // #74: 本番では適用済みなのに「未適用」と信じられていた状態
+  const result = compareWithRegistry(
+    [
+      { name: "001_init", checksum: "aaa", ...applied },
+      { name: "002_harden", checksum: "bbb", ...applied },
+      {
+        name: "003_failed",
+        checksum: "ccc",
+        finishedAt: null,
+        rolledBackAt: null,
+      },
+    ],
+    {
+      applied: { "001_init": "aaa", "004_missing": "ddd" },
+      pending: ["002_harden", "003_failed"],
+    },
+  );
+  assert.deepEqual(result, {
+    pendingButApplied: [{ name: "002_harden", checksum: "bbb" }],
+    appliedButNotInDb: ["004_missing"],
+  });
 });

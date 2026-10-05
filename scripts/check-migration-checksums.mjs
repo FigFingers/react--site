@@ -9,8 +9,13 @@ import pg from "pg";
 
 import {
   compareMigrationChecksums,
+  compareWithRegistry,
   localMigrationChecksums,
 } from "./lib/migration-checksums.mjs";
+import {
+  APPLIED_MIGRATIONS,
+  PENDING_MIGRATIONS,
+} from "./lib/migration-registry.mjs";
 
 const MIGRATIONS_DIR = "prisma/migrations";
 
@@ -52,6 +57,25 @@ for (const name of pending) {
 for (const name of dbOnly) {
   console.warn(
     `[checksum] DB にだけある（手元に無い）: ${name} — 別ブランチの migration が先に適用されていないか確認すること`,
+  );
+}
+const { pendingButApplied, appliedButNotInDb } = compareWithRegistry(records, {
+  applied: APPLIED_MIGRATIONS,
+  pending: PENDING_MIGRATIONS,
+});
+for (const { name, checksum } of pendingButApplied) {
+  console.warn(
+    `[checksum] 未適用（PENDING_MIGRATIONS）に分類されているが、この DB では適用済み: ${name}
+` +
+      "           本番の DB なら scripts/lib/migration-registry.mjs の APPLIED_MIGRATIONS へ移すこと。" +
+      `
+           checksum ${checksum}`,
+  );
+}
+for (const name of appliedButNotInDb) {
+  console.warn(
+    `[checksum] 適用済み（APPLIED_MIGRATIONS）に分類されているが、この DB には無い: ${name}` +
+      " — 接続先が本番と別の DB か、分類の誤り",
   );
 }
 for (const { name, recorded, local } of mismatched) {

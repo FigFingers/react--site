@@ -55,3 +55,29 @@ export function compareMigrationChecksums(records, localChecksums) {
     pending: pending.sort(),
   };
 }
+
+/**
+ * migration-registry.mjs の分類を、DB の適用状態と突き合わせる。
+ *
+ * - pendingButApplied: 未適用（PENDING）に分類されているが DB では適用済み。
+ *   本番の DB なら APPLIED へ移すべきもの。移すときに使う checksum を添える。
+ *   #74 はこの状態のファイルを「未適用」と信じて書き換えた。
+ * - appliedButNotInDb: 適用済み（APPLIED）に分類されているが DB には無い。
+ *   接続先が本番と別の DB か、分類の誤り。
+ */
+export function compareWithRegistry(records, { applied, pending }) {
+  const appliedInDb = new Map();
+  for (const record of records) {
+    if (record.finishedAt == null || record.rolledBackAt != null) continue;
+    appliedInDb.set(record.name, record.checksum);
+  }
+
+  const pendingButApplied = pending
+    .filter((name) => appliedInDb.has(name))
+    .map((name) => ({ name, checksum: appliedInDb.get(name) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const appliedButNotInDb = Object.keys(applied)
+    .filter((name) => !appliedInDb.has(name))
+    .sort();
+  return { pendingButApplied, appliedButNotInDb };
+}

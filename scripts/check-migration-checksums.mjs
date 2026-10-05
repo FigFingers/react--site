@@ -10,6 +10,7 @@ import pg from "pg";
 import {
   compareMigrationChecksums,
   compareWithRegistry,
+  countChecksumFailures,
   localMigrationChecksums,
 } from "./lib/migration-checksums.mjs";
 import {
@@ -63,32 +64,44 @@ const { pendingButApplied, appliedButNotInDb } = compareWithRegistry(records, {
   applied: APPLIED_MIGRATIONS,
   pending: PENDING_MIGRATIONS,
 });
-for (const { name, checksum } of pendingButApplied) {
-  console.warn(
-    `[checksum] 未適用（PENDING_MIGRATIONS）に分類されているが、この DB では適用済み: ${name}
-` +
-      "           本番の DB なら scripts/lib/migration-registry.mjs の APPLIED_MIGRATIONS へ移すこと。" +
-      `
-           checksum ${checksum}`,
-  );
-}
+const allowPendingApplied = process.env.CODEX_DB_ALLOW_PENDING_APPLIED === "1";
+
 for (const name of appliedButNotInDb) {
   console.warn(
     `[checksum] 適用済み（APPLIED_MIGRATIONS）に分類されているが、この DB には無い: ${name}` +
       " — 接続先が本番と別の DB か、分類の誤り",
   );
 }
-for (const { name, recorded, local } of mismatched) {
-  console.error(
-    `[checksum] 適用済みの本文が記録と違う: ${name}\n` +
-      `           記録 ${recorded}\n           手元 ${local}`,
+for (const { name, checksum } of pendingButApplied) {
+  const report = allowPendingApplied ? console.warn : console.error;
+  report(
+    [
+      `[checksum] 未適用（PENDING_MIGRATIONS）に分類されているが、この DB では適用済み: ${name}`,
+      `           scripts/lib/migration-registry.mjs の APPLIED_MIGRATIONS へ移すこと（checksum ${checksum}）。`,
+      "           専用の開発 DB で migrate dev した直後なら、CODEX_DB_ALLOW_PENDING_APPLIED=1 で警告に下げられる。",
+    ].join("\n"),
   );
 }
-
+for (const { name, recorded, local } of mismatched) {
+  console.error(
+    [
+      `[checksum] 適用済みの本文が記録と違う: ${name}`,
+      `           記録 ${recorded}`,
+      `           手元 ${local}`,
+    ].join("\n"),
+  );
+}
 if (mismatched.length > 0) {
   console.error(
     "[checksum] 適用済みの migration.sql は編集しない。変更を取り消し、必要な DDL は新しい migration に書くこと。",
   );
+}
+if (
+  countChecksumFailures(
+    { mismatched, pendingButApplied },
+    { allowPendingApplied },
+  ) > 0
+) {
   process.exit(1);
 }
 const comparedCount = localMigrationCount - pending.length;

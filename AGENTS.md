@@ -109,7 +109,11 @@ none of it, and neither does a fresh agent session on another machine.
 - For DB-backed behavior changes, also run `npm run codex:db`: configuration, optional
   SSH tunnel, migration status, and a comparison of `_prisma_migrations` checksums with the
   local `migration.sql` files (read-only). It fails when an applied migration's file differs
-  from what was recorded and warns about migrations recorded only in the database.
+  from what was recorded, and when a migration recorded as pending in
+  `scripts/lib/migration-registry.mjs` is already applied in that database. It warns about
+  migrations recorded only in the database. Set `CODEX_DB_ALLOW_PENDING_APPLIED=1` only when
+  the target is a dedicated development database right after `migrate dev`; it turns the
+  pending-but-applied failure into a warning and never excuses a checksum mismatch.
   This is a connectivity/history check, not a behavior test.
 - For auth, authorization, extension-token lifecycle, migration SQL/generation, or destructive
   data behavior changes, run `npm run codex:full` (quick + schema + db + production build).
@@ -148,10 +152,10 @@ none of it, and neither does a fresh agent session on another machine.
 - Deployment to shared/staging/production databases uses reviewed, committed migrations with
   `npx prisma migrate deploy` only when that deployment is in the user's authorized scope.
   Run `npx prisma generate` for the application build and run `npm run codex:db` against the
-  deployed database afterwards. It warns that the new migration is recorded as pending but
-  applied, and prints its checksum: move the entry from `PENDING_MIGRATIONS` to
-  `APPLIED_MIGRATIONS` in `scripts/lib/migration-registry.mjs` with that checksum, so CI, which
-  has no database, also rejects later edits to that file.
+  deployed database afterwards. It fails because the new migration is still recorded as pending
+  and prints its checksum: move the entry from `PENDING_MIGRATIONS` to `APPLIED_MIGRATIONS` in
+  `scripts/lib/migration-registry.mjs` with that checksum and commit it, so codex:db passes again
+  and CI, which has no database, also rejects later edits to that file.
 - If Prisma tries to generate follow-up diff noise around partial indexes, stop and inspect before proceeding.
 - シャドウDB は履歴を空の Postgres へ先頭から再生する。`20260430010000_init`
   より前に何かを挿すと再生が止まり、`migrate dev` が使えなくなる。

@@ -81,3 +81,21 @@ export function compareWithRegistry(records, { applied, pending }) {
     .sort();
   return { pendingButApplied, appliedButNotInDb };
 }
+
+/**
+ * codex:db を失敗させる件数。
+ *
+ * 適用済みファイルの書き換え（mismatched）は常に失敗。「未適用（PENDING）と
+ * 記録されているのに DB では適用済み」も既定では失敗にする。本番で記録を
+ * APPLIED へ移し忘れた状態で、#74 はここから「未適用だから書き換えてよい」と
+ * 誤った。専用の開発 DB で migrate dev した直後は正常にこの状態になるので、
+ * allowPendingApplied（CODEX_DB_ALLOW_PENDING_APPLIED=1）のときだけ失敗から外す。
+ */
+export function countChecksumFailures(
+  { mismatched, pendingButApplied },
+  { allowPendingApplied },
+) {
+  return (
+    mismatched.length + (allowPendingApplied ? 0 : pendingButApplied.length)
+  );
+}

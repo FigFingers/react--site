@@ -12,7 +12,7 @@
  * prisma/migrations の全ディレクトリは、どちらか一方に入っていなければならない
  * （CI が検査する）。新しい migration はまず PENDING に入れ、本番へ適用したら
  * codex:db が表示する checksum とともに APPLIED へ移す。分類を誤ったまま
- * 本番で適用済みになっていれば、codex:db が警告する（#74 はこの誤分類から起きた）。
+ * 本番で適用済みになっていれば、codex:db が失敗する（#74 はこの誤分類から起きた）。
  */
 export const APPLIED_MIGRATIONS = {
   "20260430010000_init":

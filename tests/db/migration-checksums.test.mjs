@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   compareMigrationChecksums,
   compareWithRegistry,
+  countChecksumFailures,
   localMigrationChecksums,
 } from "../../scripts/lib/migration-checksums.mjs";
 
@@ -112,4 +113,34 @@ test("a migration recorded as pending but applied in the DB is reported with its
     pendingButApplied: [{ name: "002_harden", checksum: "bbb" }],
     appliedButNotInDb: ["004_missing"],
   });
+});
+
+test("codex:db fails on pending-but-applied unless explicitly allowed for a dev database", () => {
+  const pendingButApplied = [{ name: "002_harden", checksum: "bbb" }];
+  const mismatched = [{ name: "001_init", recorded: "aaa", local: "zzz" }];
+
+  // 既定: 未適用と記録されたまま適用済みなら失敗（#74 の前提条件）
+  assert.equal(
+    countChecksumFailures(
+      { mismatched: [], pendingButApplied },
+      { allowPendingApplied: false },
+    ),
+    1,
+  );
+  // 専用の開発 DB で明示的に許したときだけ失敗から外す
+  assert.equal(
+    countChecksumFailures(
+      { mismatched: [], pendingButApplied },
+      { allowPendingApplied: true },
+    ),
+    0,
+  );
+  // 適用済みファイルの書き換えは、許可しても常に失敗
+  assert.equal(
+    countChecksumFailures(
+      { mismatched, pendingButApplied },
+      { allowPendingApplied: true },
+    ),
+    1,
+  );
 });

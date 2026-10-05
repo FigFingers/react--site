@@ -420,6 +420,12 @@ try {
     data: { clipId: fixtureClip.id, userId: otherUser.id, body: otherText },
     select: { id: true },
   });
+  // 削除の通信中に通報ボタンが押せないことを見るための、未通報のコメント
+  const otherText2 = `別ユーザーの2件目 ${Date.now()}`;
+  const otherComment2 = await prisma.clipComment.create({
+    data: { clipId: fixtureClip.id, userId: otherUser.id, body: otherText2 },
+    select: { id: true },
+  });
 
   await page.keyboard.press("Escape");
   await dialog2.waitFor({ state: "detached", timeout: 5000 });
@@ -466,6 +472,46 @@ try {
       reports[0].resolution === "dismissed",
     reports,
   );
+
+  // 所有者による他人のコメントの削除。通信中は通報ボタンも押せない
+  // （削除の確認欄と通報フォームを同時に開かせない）。
+  const others2 = dialog3.locator("article", { hasText: otherText2 });
+  const other2Route = `**/api/v1/clips/*/comments/${otherComment2.id}`;
+  let releaseOther2 = () => {};
+  const other2Held = new Promise<void>((resolve) => {
+    releaseOther2 = resolve;
+  });
+  await page.route(other2Route, async (route: any) => {
+    if (route.request().method() !== "DELETE") return route.continue();
+    await other2Held;
+    await route.continue();
+  });
+  await others2
+    .getByRole("button", { name: "このコメントを削除（クリップ所有者）" })
+    .click();
+  await others2.getByRole("button", { name: "削除する", exact: true }).click();
+  await others2
+    .getByRole("button", { name: "削除中…", exact: true })
+    .waitFor({ state: "visible", timeout: 5000 });
+  check(
+    "削除の通信中は、未通報のコメントでも通報ボタンを押せない",
+    await others2
+      .getByRole("button", { name: "このコメントを通報" })
+      .isDisabled(),
+  );
+  releaseOther2();
+  await others2.waitFor({ state: "detached", timeout: 10000 });
+  check(
+    "所有者は他人のコメントを削除できる",
+    (await others2.count()) === 0 &&
+      (
+        await prisma.clipComment.findUnique({
+          where: { id: otherComment2.id },
+          select: { deletedAt: true },
+        })
+      )?.deletedAt != null,
+  );
+  await page.unroute(other2Route);
 
   await ctx.close();
 } catch (e) {

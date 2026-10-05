@@ -335,8 +335,9 @@ export default function CommentModal({
   };
 
   const beginReport = (comment: Comment) => {
-    // 削除の通信中は確認欄を閉じない（閉じるのは削除の結果が出たとき）。
-    if (deletingId === null) setConfirmingDeleteId(null);
+    // 削除の通信中は通報ボタンを押せない（削除の確認欄と通報フォームを同時に開かない）
+    if (deletingId !== null) return;
+    setConfirmingDeleteId(null);
     setReportTarget(comment);
     setReportReason("other");
     setReportNote("");
@@ -685,7 +686,9 @@ export default function CommentModal({
                       type="button"
                       onClick={() => beginReport(comment)}
                       disabled={
-                        reportingId !== null || reportedIds.includes(comment.id)
+                        reportingId !== null ||
+                        deletingId !== null ||
+                        reportedIds.includes(comment.id)
                       }
                       className="shrink-0 cursor-pointer rounded-full border-2 border-ink bg-white px-2 py-0.5 text-[11px] font-extrabold hover:bg-chip disabled:cursor-not-allowed disabled:opacity-40"
                       aria-label="このコメントを通報"

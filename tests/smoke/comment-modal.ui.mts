@@ -332,6 +332,21 @@ try {
     await becomesFocused(deleteButton),
   );
 
+  // Escape は確認欄だけを閉じる（ネイティブの confirm と同じ）。モーダルは残る。
+  await deleteButton.click();
+  await confirmDelete.waitFor({ state: "visible", timeout: 5000 });
+  await page.keyboard.press("Escape");
+  await confirmDelete.waitFor({ state: "detached", timeout: 5000 });
+  check(
+    "確認欄で Escape を押すと確認欄だけが閉じ、モーダルは残る",
+    (await page.getByRole("dialog").count()) === 1 &&
+      (await reloaded.count()) === 1,
+  );
+  check(
+    "Escape で確認欄を閉じるとフォーカスが削除ボタンへ戻る",
+    await becomesFocused(deleteButton),
+  );
+
   // 削除が失敗する場合。DELETE を止めておき、通信中と失敗後のフォーカスを見る。
   const deleteRoute = `**/api/v1/clips/*/comments/${createdComment.id}`;
   let releaseDelete = () => {};

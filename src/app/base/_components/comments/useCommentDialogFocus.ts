@@ -2,10 +2,15 @@
 
 import { type RefObject, useEffect, useRef } from "react";
 
+/**
+ * onEscape は Escape が押されたときに呼ぶ。モーダルを閉じるかどうかは呼び出し側が決める
+ * （開いている確認欄やフォームを先に閉じるため）。同一性が変わると effect が走り直して
+ * フォーカスをダイアログへ戻してしまうので、呼び出し側は安定した関数を渡すこと。
+ */
 export function useCommentDialogFocus(
   isOpen: boolean,
   dialogRef: RefObject<HTMLDivElement | null>,
-  closeModal: () => void,
+  onEscape: () => void,
 ) {
   const previousFocusRef = useRef<HTMLElement | null>(null);
   // モーダルへフォーカスを移し、Tab を内部に閉じ込め、閉じたら元へ戻す。
@@ -22,7 +27,7 @@ export function useCommentDialogFocus(
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        closeModal();
+        onEscape();
         return;
       }
       if (e.key !== "Tab" || !dialogRef.current) return;
@@ -62,5 +67,5 @@ export function useCommentDialogFocus(
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
-  }, [closeModal, dialogRef, isOpen]);
+  }, [onEscape, dialogRef, isOpen]);
 }

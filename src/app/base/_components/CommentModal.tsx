@@ -311,7 +311,11 @@ export default function CommentModal({
     };
   }, [isOpen, loadFirstPage, loadReportSummaries]);
 
-  useCommentDialogFocus(isOpen, dialogRef, closeModal);
+  // Escape は、開いている削除の確認欄や通報フォームを先に閉じ、何も開いていなければ
+  // モーダルを閉じる。中身は描画ごとに差し替えるが、フックに渡す関数の同一性は保つ。
+  const escapeHandlerRef = useRef<() => void>(() => {});
+  const handleEscape = useCallback(() => escapeHandlerRef.current(), []);
+  useCommentDialogFocus(isOpen, dialogRef, handleEscape);
 
   const loadMore = async () => {
     if (!nextCursor || loadingMore) return;
@@ -539,6 +543,19 @@ export default function CommentModal({
         setSubmitting(false);
       }
     }
+  };
+
+  escapeHandlerRef.current = () => {
+    if (confirmingDeleteId !== null) {
+      // 削除の通信中は結果が出るまで閉じない
+      if (deletingId === null) cancelDelete(confirmingDeleteId);
+      return;
+    }
+    if (reportTarget !== null) {
+      if (reportingId === null) cancelReport(reportTarget.id);
+      return;
+    }
+    closeModal();
   };
 
   if (!isOpen) return null;

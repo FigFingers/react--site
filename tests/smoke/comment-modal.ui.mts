@@ -332,6 +332,45 @@ try {
     await becomesFocused(deleteButton),
   );
 
+  // 削除が失敗する場合。DELETE を止めておき、通信中と失敗後のフォーカスを見る。
+  const deleteRoute = `**/api/v1/clips/*/comments/${createdComment.id}`;
+  let releaseDelete = () => {};
+  const deleteHeld = new Promise<void>((resolve) => {
+    releaseDelete = resolve;
+  });
+  await page.route(deleteRoute, async (route: any) => {
+    if (route.request().method() !== "DELETE") return route.continue();
+    await deleteHeld;
+    await route.fulfill({
+      status: 500,
+      contentType: "application/json",
+      body: JSON.stringify({ message: "smoke", code: "INTERNAL" }),
+    });
+  });
+  await deleteButton.click();
+  await confirmDelete.click();
+  const deletingButton = reloaded.getByRole("button", {
+    name: "削除中…",
+    exact: true,
+  });
+  await deletingButton.waitFor({ state: "visible", timeout: 5000 });
+  check(
+    "削除の通信中も確認欄が残り、フォーカスがダイアログの外へ落ちない",
+    await becomesFocused(deletingButton),
+  );
+  releaseDelete();
+  await cancelDelete.waitFor({ state: "detached", timeout: 5000 });
+  check(
+    "削除に失敗するとエラーが出て、コメントは残る",
+    (await dialog2.getByText("コメントを削除できませんでした。").count()) ===
+      1 && (await reloaded.count()) === 1,
+  );
+  check(
+    "削除に失敗するとフォーカスが削除ボタンへ戻る",
+    await becomesFocused(deleteButton),
+  );
+  await page.unroute(deleteRoute);
+
   await deleteButton.click();
   await confirmDelete.click();
   await reloaded.waitFor({ state: "detached", timeout: 15000 });

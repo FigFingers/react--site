@@ -343,7 +343,8 @@ export default function CommentModal({
   };
 
   const beginReport = (comment: Comment) => {
-    setConfirmingDeleteId(null);
+    // 削除の通信中は確認欄を閉じない（閉じるのは削除の結果が出たとき）。
+    if (deletingId === null) setConfirmingDeleteId(null);
     setReportTarget(comment);
     setReportReason("other");
     setReportNote("");
@@ -445,13 +446,15 @@ export default function CommentModal({
     const nextFocusId =
       comments[commentIndex + 1]?.id ?? comments[commentIndex - 1]?.id ?? null;
 
-    setConfirmingDeleteId(null);
+    // 確認欄は通信が終わるまで閉じない。押したボタンを外すとフォーカスが
+    // ダイアログの外へ落ちる（CommentDeleteConfirm 参照）。
     setDeletingId(comment.id);
     setErrorMessage("");
     try {
       await deleteClipComment(clipId, comment.id);
       if (!isRequestCurrent(generation)) return;
 
+      setConfirmingDeleteId(null);
       setComments((prev) => prev.filter((c) => c.id !== comment.id));
       focusAfterDomUpdate(generation, () =>
         nextFocusId == null
@@ -467,6 +470,14 @@ export default function CommentModal({
           : status === 403
             ? "このコメントを削除する権限がありません。"
             : "コメントを削除できませんでした。",
+      );
+      // 失敗したら確認欄を閉じ、操作の起点だった削除ボタンへ戻す。
+      // finally を待たずに解除するのは、ボタンが disabled のままだと
+      // フォーカスを受け取れないため。
+      setConfirmingDeleteId(null);
+      setDeletingId(null);
+      focusAfterDomUpdate(generation, () =>
+        deleteButtonRefs.current.get(comment.id),
       );
     } finally {
       if (isRequestCurrent(generation)) setDeletingId(null);
@@ -704,6 +715,7 @@ export default function CommentModal({
                 {confirmingDeleteId === comment.id && (
                   <CommentDeleteConfirm
                     cancelButtonRef={deleteCancelButtonRef}
+                    deleting={deletingId === comment.id}
                     onCancel={() => cancelDelete(comment.id)}
                     onConfirm={() => void remove(comment)}
                   />

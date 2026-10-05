@@ -12,7 +12,7 @@ import {
   reportClipComment,
 } from "@/lib/comments/client";
 import {
-  mergeReportSummaryPage,
+  addReportToSummary,
   upsertCommentsById,
   upsertReportedCommentsById,
 } from "@/lib/comments/collections";
@@ -104,8 +104,6 @@ export default function CommentModal({
   const bodyRevisionRef = useRef(0);
   const requestGenerationRef = useRef(0);
   const reportLoadRequestRef = useRef(0);
-  /** 「古い通報情報も読み込む」で続きのページを読んだか。 */
-  const loadedMoreReportsRef = useRef(false);
   const isOpenRef = useRef(isOpen);
   const commentArticleRefs = useRef(new Map<number, HTMLElement>());
   const reportButtonRefs = useRef(new Map<number, HTMLButtonElement>());
@@ -249,20 +247,11 @@ export default function CommentModal({
           };
         }
         setComments((previous) => upsertReportedCommentsById(previous, rows));
-        const isContinuation = cursor != null;
-        const hasLoadedContinuation = loadedMoreReportsRef.current;
-        if (isContinuation) loadedMoreReportsRef.current = true;
+        // 先頭ページ（開いた直後とその再試行）は置き換え、続きのページは足し込む
         setReportSummaries((previous) =>
-          mergeReportSummaryPage(previous, summaries, {
-            isContinuation,
-            hasLoadedContinuation,
-          }),
+          cursor ? { ...previous, ...summaries } : summaries,
         );
-        // 続きを読み込み済みのときの先頭ページの読み直しでは、カーソルを先頭ページの
-        // 続きへ巻き戻さない。巻き戻すと読み込み済みのページをもう一度取りに行く。
-        if (isContinuation || !hasLoadedContinuation) {
-          setReportNextCursor(page.nextCursor);
-        }
+        setReportNextCursor(page.nextCursor);
         setReportLoadError(null);
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError")
@@ -300,7 +289,6 @@ export default function CommentModal({
     setReportNextCursor(null);
     setReportLoadError(null);
     setLoadingReports(false);
-    loadedMoreReportsRef.current = false;
     void loadFirstPage(controller.signal, generation);
     void loadReportSummaries(controller.signal, null, generation);
     return () => {
@@ -388,11 +376,9 @@ export default function CommentModal({
 
     setReportingId(comment.id);
     setErrorMessage("");
+    const input = { reason: reportReason, note: reportNote.trim() || null };
     try {
-      const result = await reportClipComment(clipId, comment.id, {
-        reason: reportReason,
-        note: reportNote.trim() || null,
-      });
+      const result = await reportClipComment(clipId, comment.id, input);
       if (!isRequestCurrent(generation)) return;
 
       setReportedIds((previous) =>
@@ -402,8 +388,15 @@ export default function CommentModal({
       focusAfterDomUpdate(generation, () =>
         commentArticleRefs.current.get(comment.id),
       );
-      if (result === "created") {
-        void loadReportSummaries(undefined, null, generation);
+      // 所有者が自分のクリップのコメントを通報したときは、そのコメントの通報サマリー
+      // だけをその場で更新する。先頭ページを読み直す方式だと、2 ページ目以降にある
+      // コメントへの通報は反映されない。
+      if (result === "created" && isClipOwner) {
+        const reported = { ...input, createdAt: new Date().toISOString() };
+        setReportSummaries((previous) => ({
+          ...previous,
+          [comment.id]: addReportToSummary(previous[comment.id], reported),
+        }));
       }
     } catch (error) {
       if (!isRequestCurrent(generation)) return;

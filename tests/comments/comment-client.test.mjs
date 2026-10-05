@@ -2,11 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-const {
-  mergeReportSummaryPage,
-  upsertCommentsById,
-  upsertReportedCommentsById,
-} = await import("../../src/lib/comments/collections.ts");
+const { addReportToSummary, upsertCommentsById, upsertReportedCommentsById } =
+  await import("../../src/lib/comments/collections.ts");
 const {
   COMMENT_BODY_MAX_CODE_POINTS,
   REPORT_NOTE_MAX_CODE_POINTS,
@@ -56,38 +53,29 @@ test("reported comments are merged into the visible id-descending list", () => {
   assert.deepEqual(upsertCommentsById([], current), current);
 });
 
-test("re-reading the first report page keeps already loaded continuation pages", () => {
-  const loaded = { 30: "page 1 (old count)", 5: "page 2" };
-  const firstPage = { 30: "page 1 (new count)", 25: "newly reported" };
+test("a new report updates only that comment's summary, keeping the newest five", () => {
+  const report = (n) => ({
+    reason: "spam",
+    note: `note ${n}`,
+    createdAt: `2026-10-0${n}T00:00:00.000Z`,
+  });
 
-  // 開いた直後・続きを読む前の読み直しは置き換える（古い表示を残さない）
-  assert.deepEqual(
-    mergeReportSummaryPage(loaded, firstPage, {
-      isContinuation: false,
-      hasLoadedContinuation: false,
-    }),
-    firstPage,
-  );
-  // 続きを読んだ後の読み直し（通報直後の更新）は、続きのページを消さない
-  assert.deepEqual(
-    mergeReportSummaryPage(loaded, firstPage, {
-      isContinuation: false,
-      hasLoadedContinuation: true,
-    }),
-    { 30: "page 1 (new count)", 25: "newly reported", 5: "page 2" },
-  );
-  // 続きのページは足し込む
-  assert.deepEqual(
-    mergeReportSummaryPage(
-      firstPage,
-      { 5: "page 2" },
-      {
-        isContinuation: true,
-        hasLoadedContinuation: false,
-      },
-    ),
-    { 30: "page 1 (new count)", 25: "newly reported", 5: "page 2" },
-  );
+  // まだサマリーの無いコメント（2 ページ目以降にあって未読込のものを含む）
+  assert.deepEqual(addReportToSummary(undefined, report(1)), {
+    reportCount: 1,
+    recentReports: [report(1)],
+  });
+
+  // 既存のサマリーには件数を足し、新しい通報を先頭に置いて 5 件に収める
+  const current = {
+    reportCount: 7,
+    recentReports: [report(5), report(4), report(3), report(2), report(1)],
+  };
+  assert.deepEqual(addReportToSummary(current, report(6)), {
+    reportCount: 8,
+    recentReports: [report(6), report(5), report(4), report(3), report(2)],
+  });
+  assert.equal(current.reportCount, 7, "the input summary is not mutated");
 });
 
 test("CommentModal asks for deletion inside the dialog, not with window.confirm", () => {

@@ -46,6 +46,7 @@ const failures: string[] = [];
 const fixtureClipName = `UIスモーク専用 ${Date.now()}`;
 let fixtureClipId: bigint | null = null;
 let fixtureUserId: bigint | null = null;
+let otherUserId: bigint | null = null;
 let fixtureVodId: number | null = null;
 
 function check(name: string, cond: boolean, detail?: unknown) {
@@ -402,6 +403,70 @@ try {
     remaining,
   );
 
+  // ---- クリップ所有者による通報と確認済み化 -------------------------------
+  // ログイン中のユーザーはクリップ所有者。別ユーザーのコメントを通報すると、
+  // 読み直さずにそのコメントの通報サマリー（件数と理由）が出ることを見る。
+  console.log("\nクリップ所有者による通報と確認済み化");
+  const otherUser = await prisma.user.create({
+    data: {
+      name: "comment-modal-smoke-other",
+      email: `comment-modal-smoke-other-${Date.now()}-${crypto.randomUUID()}@example.invalid`,
+    },
+    select: { id: true },
+  });
+  otherUserId = otherUser.id;
+  const otherText = `別ユーザーのコメント ${Date.now()}`;
+  const otherComment = await prisma.clipComment.create({
+    data: { clipId: fixtureClip.id, userId: otherUser.id, body: otherText },
+    select: { id: true },
+  });
+
+  await page.keyboard.press("Escape");
+  await dialog2.waitFor({ state: "detached", timeout: 5000 });
+  await fixtureCommentButton(page).click();
+  const dialog3 = page.getByRole("dialog");
+  await dialog3.waitFor({ state: "visible", timeout: 5000 });
+  const others = dialog3.locator("article", { hasText: otherText });
+  await others.waitFor({ state: "visible", timeout: 10000 });
+  check(
+    "通報前はバッジが出ない",
+    (await others.getByText(/^通報 \d+$/).count()) === 0,
+  );
+
+  await others.getByRole("button", { name: "このコメントを通報" }).click();
+  await others.getByRole("button", { name: "送信", exact: true }).click();
+  const badge = others.getByText("通報 1", { exact: true });
+  await badge.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
+  check(
+    "通報すると、読み直さずにそのコメントへバッジと理由が出る",
+    (await badge.count()) === 1 &&
+      (await others.getByText("最近の通報理由").count()) === 1 &&
+      (await others.getByText("その他", { exact: true }).count()) === 1,
+  );
+  check(
+    "通報ボタンは「通報済み」になる",
+    (await others
+      .getByRole("button", { name: "このコメントを通報" })
+      .innerText()) === "通報済み",
+  );
+
+  await others
+    .getByRole("button", { name: "問題なしとして確認済みにする" })
+    .click();
+  await badge.waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+  check("確認済みにするとバッジが消える", (await badge.count()) === 0);
+  const reports = await prisma.clipCommentReport.findMany({
+    where: { commentId: otherComment.id },
+    select: { resolvedAt: true, resolution: true },
+  });
+  check(
+    "確認済みにした通報は DB でも dismissed で解決済み",
+    reports.length === 1 &&
+      reports[0].resolvedAt !== null &&
+      reports[0].resolution === "dismissed",
+    reports,
+  );
+
   await ctx.close();
 } catch (e) {
   fail++;
@@ -420,6 +485,13 @@ try {
       console.log(`\n後始末: 専用コメントを物理削除 ${r.count} 件`);
       await prisma.clip.delete({ where: { id } });
       console.log(`後始末: 専用クリップを物理削除 ${id}`);
+    });
+  }
+  if (otherUserId != null) {
+    const id = otherUserId;
+    await cleanupStep("別ユーザーの物理削除", async () => {
+      await prisma.user.delete({ where: { id } });
+      console.log(`後始末: 別ユーザーを物理削除 ${id}`);
     });
   }
   if (fixtureUserId != null) {

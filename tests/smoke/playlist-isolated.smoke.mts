@@ -142,6 +142,10 @@ try {
   console.log(
     "PASS: duplicate add, soft removal, restoration, VOD retry and deleted-clip visibility",
   );
+  const { runExtensionSyncChecks } = await import(
+    "./extension-sync-checks.mjs"
+  );
+  await runExtensionSyncChecks(prisma);
   if (process.env.PLAYLIST_TEST_UI === "1") {
     await prisma.clip.update({ where: { id: 103 }, data: { deletedAt: null } });
     await service.reorderPlaylistClips(

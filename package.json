@@ -21,7 +21,10 @@
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
     "prepare": "husky",
-    "test:comments": "node --import tsx --test \"tests/comments/*.test.mjs\""
+    "test:comments": "node --import tsx --test \"tests/comments/*.test.mjs\"",
+    "smoke:comments": "node --import tsx --env-file=.env.local tests/smoke/clip-comments.smoke.mts",
+    "smoke:extension": "node --import tsx --env-file=.env.local tests/smoke/extension-comments.smoke.mts",
+    "smoke:extension-client": "node --import tsx --env-file=.env.local tests/smoke/extension-client.contract.mts"
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

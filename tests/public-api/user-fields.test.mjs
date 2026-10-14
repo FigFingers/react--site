@@ -65,6 +65,7 @@ for (const [model, repository, filter] of [
     assert.equal(queryMock.mock.callCount(), 2);
     const nextQuery = queryMock.mock.calls[1].arguments[0];
     assert.equal(nextQuery.where.userId, 2);
+    assert.ok(nextQuery.where.AND.length > 0);
     assert.deepEqual(nextQuery.where.OR, [
       { createdAt: { lt: createdAt } },
       { AND: [{ createdAt }, { id: { lt: 3 } }] },

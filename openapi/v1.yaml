@@ -123,7 +123,7 @@ components:
           schema:
             $ref: "#/components/schemas/Error"
     Conflict:
-      description: Conflict / Unique constraint violation
+      description: Conflict / Concurrent transaction or unique constraint violation
       content:
         application/json:
           schema:
@@ -132,6 +132,8 @@ components:
     ID:
       type: integer
       minimum: 1
+      maximum: 9007199254740991
+      description: JavaScript safe integer. Values above this boundary are rejected.
     DateTime:
       type: string
       format: date-time
@@ -1549,6 +1551,12 @@ paths:
                 $ref: "#/components/schemas/Clip"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "409":
+          description: The requested clip range would exclude an active comment anchor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
     delete:
       operationId: clips.delete
       x-permission: ownerOrAdmin

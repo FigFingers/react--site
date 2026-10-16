@@ -331,6 +331,26 @@ test("clipCommentReportCreateBodySchema", async (t) => {
     );
   });
 
+  await t.test(
+    "画面のラベルはサーバーと同じ理由の一覧を過不足なく持つ",
+    async () => {
+      const shared = await import("../../src/lib/comments/reportReasons.ts");
+      const labels = await import(
+        "../../src/app/base/_components/comments/reportReasons.ts"
+      );
+      const { CLIP_COMMENT_REPORT_REASONS: sharedReasons } =
+        shared.default ?? shared;
+      const { REPORT_REASON_LABELS } = labels.default ?? labels;
+
+      // スキーマが共有モジュールの配列そのものを使っている（別定義に戻っていない）
+      assert.equal(CLIP_COMMENT_REPORT_REASONS, sharedReasons);
+      assert.deepEqual(
+        Object.keys(REPORT_REASON_LABELS).sort(),
+        [...sharedReasons].sort(),
+      );
+    },
+  );
+
   await t.test("未知の理由は拒否", () => {
     assert.equal(schema.safeParse({ reason: "because" }).success, false);
     assert.equal(schema.safeParse({ reason: "" }).success, false);

@@ -27,6 +27,8 @@ interface Props {
   userId: string | null;
   isOwner: boolean;
   playlistId: number;
+  disabled?: boolean;
+  onRemoved: (clipId: number) => void;
 }
 
 function SortableClipItem({
@@ -35,6 +37,8 @@ function SortableClipItem({
   clip,
   userId,
   isOwner,
+  disabled = false,
+  onRemoved,
 }: Props) {
   const router = useRouter();
   const [removing, setRemoving] = useState(false);
@@ -46,7 +50,7 @@ function SortableClipItem({
     setActivatorNodeRef,
     transform,
     transition,
-  } = useSortable({ id: clipId });
+  } = useSortable({ id: clipId, disabled: !isOwner || disabled || removing });
 
   const style = useMemo(
     () => ({
@@ -91,7 +95,7 @@ function SortableClipItem({
           <button
             type="button"
             onClick={async () => {
-              if (removing) return;
+              if (removing || disabled) return;
               if (
                 !window.confirm(
                   `「${clip.clipName || "このクリップ"}」をプレイリストから削除しますか？`,
@@ -103,6 +107,7 @@ function SortableClipItem({
               setError("");
               try {
                 await removePlaylistClip(playlistId, clipId);
+                onRemoved(clipId);
                 router.refresh();
               } catch (error) {
                 setError((error as Error).message);
@@ -110,7 +115,7 @@ function SortableClipItem({
                 setRemoving(false);
               }
             }}
-            disabled={removing}
+            disabled={removing || disabled}
             className="grid h-8 w-8 cursor-pointer place-items-center rounded-lg border-2 border-ink bg-white text-[16px] font-extrabold text-accent hover:bg-badge-nf"
             title="プレイリストから削除"
             aria-label="プレイリストから削除"

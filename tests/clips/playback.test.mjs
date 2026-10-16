@@ -2,10 +2,10 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import {
-  buildPlaybackUrl,
-  buildServiceUrl,
-} from "../../src/lib/clips/playback.ts";
+
+const { buildPlaybackUrl, buildServiceUrl } = await import(
+  "../../src/lib/clips/playback.ts"
+);
 
 test("buildServiceUrl prepends the service base to relative paths", () => {
   assert.equal(

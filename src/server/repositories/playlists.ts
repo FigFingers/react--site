@@ -15,6 +15,7 @@ export function findWithClips(id: number) {
       name: true,
       userId: true,
       clipsPlaylists: {
+        where: { deletedAt: null, clip: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         include: {
           clip: {
@@ -152,7 +153,9 @@ export async function addClipIfActive(playlistId: number, clipId: number) {
       INSERT INTO clips_playlists (playlist_id, clip_id)
       SELECT ${playlistId}, ${clipId}
       FROM active
-      ON CONFLICT (clip_id, playlist_id) DO NOTHING
+      ON CONFLICT (clip_id, playlist_id) DO UPDATE
+        SET deleted_at = NULL, created_at = now()
+        WHERE clips_playlists.deleted_at IS NOT NULL
       RETURNING 1
     )
     SELECT
@@ -164,8 +167,9 @@ export async function addClipIfActive(playlistId: number, clipId: number) {
 }
 
 export function removeClip(playlistId: number, clipId: number) {
-  return prisma.clipPlaylist.delete({
-    where: { clipId_playlistId: { clipId, playlistId } },
+  return prisma.clipPlaylist.update({
+    where: { clipId_playlistId: { clipId, playlistId }, deletedAt: null },
+    data: { deletedAt: new Date() },
   });
 }
 
@@ -177,6 +181,7 @@ export async function listClips(
   const take = opts.take ?? 20;
   const where: Prisma.ClipPlaylistWhereInput = {
     playlistId,
+    deletedAt: null,
     clip: { deletedAt: null },
   };
   const [total, rels] = await Promise.all([

@@ -907,6 +907,8 @@ components:
       properties:
         name:
           type: string
+          description: Leading and trailing whitespace is trimmed before validation.
+          minLength: 1
           maxLength: 255
       additionalProperties: false
     PlaylistUpdate:
@@ -914,6 +916,8 @@ components:
       properties:
         name:
           type: string
+          description: Leading and trailing whitespace is trimmed before validation.
+          minLength: 1
           maxLength: 255
       additionalProperties: false
 paths:
@@ -2450,6 +2454,9 @@ paths:
       tags:
         - Playlists
       summary: Add a clip to playlist (owner)
+      description: >-
+        Idempotent; adding an already attached active clip also returns 201.
+        A previously removed membership is restored with a new addition timestamp.
       security:
         - nextAuthSession: []
         - bearerAuth: []
@@ -2469,8 +2476,6 @@ paths:
           description: Added
         "404":
           $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
   "/playlists/{playlistId}/clips/{clipId}":
     parameters:
       - name: playlistId
@@ -2542,6 +2547,7 @@ paths:
       tags:
         - Playlists
       summary: Attach a VOD to playlist (owner)
+      description: Idempotent; attaching an already attached active VOD also returns 201.
       security:
         - nextAuthSession: []
         - bearerAuth: []
@@ -2561,8 +2567,6 @@ paths:
           description: Attached
         "404":
           $ref: "#/components/responses/NotFound"
-        "409":
-          $ref: "#/components/responses/Conflict"
   "/playlists/{playlistId}/vods/{vodId}":
     parameters:
       - name: playlistId

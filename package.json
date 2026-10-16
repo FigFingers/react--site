@@ -20,7 +20,8 @@
     "lint": "biome check .",
     "lint:fix": "biome check --apply .",
     "format": "biome format --write .",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test:comments": "node --import tsx --test \"tests/comments/*.test.mjs\""
   },
   "dependencies": {
     "@auth/core": "^0.40.0",

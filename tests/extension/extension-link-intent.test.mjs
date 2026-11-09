@@ -46,6 +46,8 @@ function installExtensionWindow(
 ) {
   const instanceIds = [instanceId].flat();
   const listeners = new Set();
+  // 発火も解除もされていない待機タイマー。応答・失敗・タイムアウトの後に空であること。
+  const timers = new Set();
   const messages = [];
   const reply = (data) =>
     queueMicrotask(() => {
@@ -56,8 +58,18 @@ function installExtensionWindow(
   const browserWindow = {
     location: { origin: ORIGIN },
     // 呼び出し時に解決し、t.mock.timers の差し替えを効かせる。
-    setTimeout: (...args) => setTimeout(...args),
-    clearTimeout: (id) => clearTimeout(id),
+    setTimeout(callback, delay) {
+      const id = setTimeout(() => {
+        timers.delete(id);
+        callback();
+      }, delay);
+      timers.add(id);
+      return id;
+    },
+    clearTimeout(id) {
+      timers.delete(id);
+      clearTimeout(id);
+    },
     addEventListener(type, handler) {
       if (type === "message") listeners.add(handler);
     },
@@ -83,7 +95,7 @@ function installExtensionWindow(
   };
 
   globalThis.window = browserWindow;
-  return { messages, listeners };
+  return { messages, listeners, timers };
 }
 
 // サイト画面からの通信は linkToken の発行だけを許し、それ以外は失敗させる。
@@ -204,7 +216,7 @@ test("unlink targets the server-confirmed instance when another browser performs
 
 test("the page sends only the link token and never receives the extension auth token", async (t) => {
   restoreGlobalsAfter(t);
-  const { messages, listeners } = installExtensionWindow();
+  const { messages, listeners, timers } = installExtensionWindow();
   const requests = installLinkTokenFetch();
 
   const result = await linkExtensionToCurrentUserFromUserAction();
@@ -228,6 +240,7 @@ test("the page sends only the link token and never receives the extension auth t
   assert.ok(messages.every(({ targetOrigin }) => targetOrigin === ORIGIN));
   assert.deepEqual(result, { extensionInstanceId: CURRENT_INSTANCE_ID });
   assert.equal(listeners.size, 0);
+  assert.equal(timers.size, 0);
 });
 
 test("the page code has no path that handles the extension auth token", () => {
@@ -245,7 +258,7 @@ test("the page code has no path that handles the extension auth token", () => {
 test("results for another request are ignored and a duplicate result is not handled twice", async (t) => {
   restoreGlobalsAfter(t);
   let listenersAtDuplicate;
-  const { listeners } = installExtensionWindow(CURRENT_INSTANCE_ID, {
+  const { listeners, timers } = installExtensionWindow(CURRENT_INSTANCE_ID, {
     respondToLink(message, reply) {
       // 先に届く別 requestId の失敗を受けていれば、ここで reject されるはず。
       reply(
@@ -269,6 +282,7 @@ test("results for another request are ignored and a duplicate result is not hand
   // 一致した最初の結果で待機を終え、重複が届く時点では受け手がいない。
   assert.equal(listenersAtDuplicate, 0);
   assert.equal(listeners.size, 0);
+  assert.equal(timers.size, 0);
 });
 
 test("a failed link result surfaces its reason and status without retrying", async (t) => {
@@ -308,7 +322,7 @@ test("a failed link result surfaces its reason and status without retrying", asy
   for (const { fields, reason, status } of cases) {
     await t.test(`${JSON.stringify(fields)}`, async (t) => {
       restoreGlobalsAfter(t);
-      const { messages, listeners } = installExtensionWindow(
+      const { messages, listeners, timers } = installExtensionWindow(
         CURRENT_INSTANCE_ID,
         {
           respondToLink: (message, reply) => reply(linkResult(message, fields)),
@@ -326,13 +340,14 @@ test("a failed link result surfaces its reason and status without retrying", asy
       assert.equal(requests.length, 1);
       assert.equal(linkMessagesOf(messages).length, 1);
       assert.equal(listeners.size, 0);
+      assert.equal(timers.size, 0);
     });
   }
 });
 
 test("instance_mismatch re-reads the instance id and retries once", async (t) => {
   restoreGlobalsAfter(t);
-  const { messages, listeners } = installExtensionWindow(
+  const { messages, listeners, timers } = installExtensionWindow(
     [OTHER_INSTANCE_ID, CURRENT_INSTANCE_ID],
     {
       respondToLink: (message, reply) =>
@@ -361,20 +376,24 @@ test("instance_mismatch re-reads the instance id and retries once", async (t) =>
   // やり直しでは新しい linkToken を発行し直す。
   assert.equal(requests.length, 2);
   assert.equal(listeners.size, 0);
+  assert.equal(timers.size, 0);
 });
 
 test("instance_mismatch is not retried more than once", async (t) => {
   restoreGlobalsAfter(t);
-  const { messages, listeners } = installExtensionWindow(CURRENT_INSTANCE_ID, {
-    respondToLink: (message, reply) =>
-      reply(
-        linkResult(message, {
-          ok: false,
-          linked: false,
-          reason: "instance_mismatch",
-        }),
-      ),
-  });
+  const { messages, listeners, timers } = installExtensionWindow(
+    CURRENT_INSTANCE_ID,
+    {
+      respondToLink: (message, reply) =>
+        reply(
+          linkResult(message, {
+            ok: false,
+            linked: false,
+            reason: "instance_mismatch",
+          }),
+        ),
+    },
+  );
   installLinkTokenFetch();
 
   await assert.rejects(
@@ -385,16 +404,17 @@ test("instance_mismatch is not retried more than once", async (t) => {
   );
   assert.equal(linkMessagesOf(messages).length, 2);
   assert.equal(listeners.size, 0);
+  assert.equal(timers.size, 0);
 });
 
-test("no result from the extension times out after 20 seconds and removes its listener", async (t) => {
+test("no result from the extension times out after 20 seconds and removes its listener and timer", async (t) => {
   restoreGlobalsAfter(t);
   t.mock.timers.enable({ apis: ["setTimeout"] });
   let linkPosted;
   const posted = new Promise((resolve) => {
     linkPosted = resolve;
   });
-  const { listeners } = installExtensionWindow(CURRENT_INSTANCE_ID, {
+  const { listeners, timers } = installExtensionWindow(CURRENT_INSTANCE_ID, {
     respondToLink: () => linkPosted(),
   });
   installLinkTokenFetch();
@@ -412,6 +432,8 @@ test("no result from the extension times out after 20 seconds and removes its li
 
   await posted;
   assert.equal(listeners.size, 1);
+  // 拡張 ID 取得の 3 秒タイマーは応答で解除済みで、残るのは結果待ちの 1 本だけ。
+  assert.equal(timers.size, 1);
 
   t.mock.timers.tick(LINK_RESULT_TIMEOUT_MS - 1);
   await new Promise((resolve) => setImmediate(resolve));
@@ -424,4 +446,5 @@ test("no result from the extension times out after 20 seconds and removes its li
       error instanceof ExtensionLinkError && error.reason === "no_response",
   );
   assert.equal(listeners.size, 0);
+  assert.equal(timers.size, 0);
 });

@@ -1,4 +1,27 @@
 const TIMEOUT_MS = 3000;
+// The extension background waits up to 15s for /api/extension/link.
+const LINK_RESULT_TIMEOUT_MS = 20_000;
+
+export const EXTENSION_LINK_NO_RESPONSE = "no_response";
+
+export class ExtensionLinkError extends Error {
+  readonly reason: string;
+  readonly status: number | null;
+
+  constructor(reason: string, status: number | null = null) {
+    super(`Extension link failed: ${reason}`);
+    this.name = "ExtensionLinkError";
+    this.reason = reason;
+    this.status = status;
+  }
+}
+
+type ExtensionLinkResult = {
+  ok?: unknown;
+  linked?: unknown;
+  reason?: unknown;
+  status?: unknown;
+};
 
 function createRequestId() {
   if (globalThis.crypto?.randomUUID) {
@@ -43,22 +66,43 @@ export async function getExtensionInstanceIdFromExtension(): Promise<string> {
   });
 }
 
-function postExtensionAuthToken(
+// Only the one-time linkToken passes through the page. The extension background
+// exchanges it for the auth token and replies with the outcome only.
+function requestLinkFromExtension(
   extensionInstanceId: string,
-  extensionAuthToken: string,
-  expiresAt: string,
-) {
-  window.postMessage(
-    {
-      type: "EXT_LINK_WITH_AUTH_TOKEN",
-      requestId: createRequestId(),
-      extensionInstanceId,
-      extensionAuthToken,
-      expiresAt,
-      token: extensionAuthToken,
-    },
-    window.location.origin,
-  );
+  linkToken: string,
+): Promise<ExtensionLinkResult | null> {
+  const requestId = createRequestId();
+
+  return new Promise((resolve) => {
+    const timeout = window.setTimeout(() => {
+      window.removeEventListener("message", handler);
+      resolve(null);
+    }, LINK_RESULT_TIMEOUT_MS);
+
+    const handler = (event: MessageEvent) => {
+      if (event.source !== window) return;
+      if (event.origin !== window.location.origin) return;
+      const data = event.data;
+      if (data?.type !== "EXTENSION_LINK_RESULT") return;
+      if (data.requestId !== requestId) return;
+
+      window.clearTimeout(timeout);
+      window.removeEventListener("message", handler);
+      resolve(data);
+    };
+
+    window.addEventListener("message", handler);
+    window.postMessage(
+      {
+        type: "EXT_LINK_WITH_LINK_TOKEN",
+        requestId,
+        extensionInstanceId,
+        linkToken,
+      },
+      window.location.origin,
+    );
+  });
 }
 
 async function requestLinkToken() {
@@ -75,20 +119,22 @@ async function requestLinkToken() {
   return body as { linkToken: string; expiresAt: string };
 }
 
-async function linkExtension(extensionInstanceId: string, linkToken: string) {
-  const res = await fetch("/api/extension/link", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({ extensionInstanceId, linkToken }),
-  });
+async function linkWithLinkToken() {
+  const extensionInstanceId = await getExtensionInstanceIdFromExtension();
+  const { linkToken } = await requestLinkToken();
+  const result = await requestLinkFromExtension(extensionInstanceId, linkToken);
 
-  const body = await res.json();
-  if (!res.ok) {
-    throw new Error(body.message || "Failed to link extension");
+  if (!result) throw new ExtensionLinkError(EXTENSION_LINK_NO_RESPONSE);
+  if (result.ok !== true || result.linked !== true) {
+    throw new ExtensionLinkError(
+      typeof result.reason === "string" ? result.reason : "link_failed",
+      typeof result.status === "number" && Number.isInteger(result.status)
+        ? result.status
+        : null,
+    );
   }
 
-  return body as { ok: true; extensionAuthToken: string; expiresAt: string };
+  return { extensionInstanceId };
 }
 
 /**
@@ -96,17 +142,18 @@ async function linkExtension(extensionInstanceId: string, linkToken: string) {
  * state; issuing a new link token during page mount would silently undo unlink.
  */
 export async function linkExtensionToCurrentUserFromUserAction() {
-  const extensionInstanceId = await getExtensionInstanceIdFromExtension();
-  const { linkToken } = await requestLinkToken();
-  const result = await linkExtension(extensionInstanceId, linkToken);
-
-  postExtensionAuthToken(
-    extensionInstanceId,
-    result.extensionAuthToken,
-    result.expiresAt,
-  );
-
-  return { ...result, extensionInstanceId };
+  try {
+    return await linkWithLinkToken();
+  } catch (error) {
+    // The extension's instance id changed after it was read; read it again once.
+    if (
+      error instanceof ExtensionLinkError &&
+      error.reason === "instance_mismatch"
+    ) {
+      return linkWithLinkToken();
+    }
+    throw error;
+  }
 }
 
 export async function unlinkExtensionFromCurrentUser(

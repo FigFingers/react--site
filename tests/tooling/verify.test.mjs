@@ -8,11 +8,8 @@ import { createFixture } from "./fixture.mjs";
 function harnessFixture(t) {
   const fixture = createFixture(t);
   fixture.write(
-    "scripts/codex-harness.mjs",
-    readFileSync(
-      new URL("../../scripts/codex-harness.mjs", import.meta.url),
-      "utf8",
-    ),
+    "scripts/verify.mjs",
+    readFileSync(new URL("../../scripts/verify.mjs", import.meta.url), "utf8"),
   );
   fixture.write("calls.jsonl", "");
   for (const [pkg, bin] of [
@@ -55,19 +52,29 @@ test("fixture test", () => {
   return fixture;
 }
 
-function run(fixture, mode, failure = "") {
+function run(fixture, mode, failure = "", npmScript = "") {
   // No command shims are available: this also catches regressions on Linux CI.
+  // npm_lifecycle_event is dropped so the script that started this test run
+  // (npm test, or the old codex:quick) does not leak into the fixture.
   const env = Object.fromEntries(
     Object.entries(process.env).filter(
-      ([key]) => key.toUpperCase() !== "PATH" && key !== "NODE_TEST_CONTEXT",
+      ([key]) =>
+        key.toUpperCase() !== "PATH" &&
+        key !== "NODE_TEST_CONTEXT" &&
+        key !== "npm_lifecycle_event",
     ),
   );
   return spawnSync(
     process.execPath,
-    [join(fixture.root, "scripts/codex-harness.mjs"), mode],
+    [join(fixture.root, "scripts/verify.mjs"), mode],
     {
       cwd: fixture.root,
-      env: { ...env, PATH: "", HARNESS_FAIL_CLI: failure },
+      env: {
+        ...env,
+        PATH: "",
+        HARNESS_FAIL_CLI: failure,
+        ...(npmScript ? { npm_lifecycle_event: npmScript } : {}),
+      },
       encoding: "utf8",
       windowsHide: true,
     },
@@ -86,7 +93,7 @@ test("quick runs installed CLIs and nested tests with tsx, as npm test does, wit
     readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
   ).scripts.test.replaceAll('"', "");
   assert.ok(
-    result.stdout.includes(`[codex] > ${testCommand}\n`),
+    result.stdout.includes(`[verify] > ${testCommand}\n`),
     result.stdout,
   );
   assert.deepEqual(calls(fixture), [
@@ -96,6 +103,28 @@ test("quick runs installed CLIs and nested tests with tsx, as npm test does, wit
     ["tests"],
     ["tsc", "-p", "tsconfig.typecheck.json", "--noEmit", "--pretty", "false"],
   ]);
+});
+
+test("the old codex:* scripts run the same gates and point to verify:*", (t) => {
+  const { scripts } = JSON.parse(
+    readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  );
+  for (const mode of ["quick", "schema", "db", "full"]) {
+    assert.equal(scripts[`verify:${mode}`], `node scripts/verify.mjs ${mode}`);
+    assert.equal(scripts[`codex:${mode}`], scripts[`verify:${mode}`]);
+  }
+
+  const fixture = harnessFixture(t);
+  const viaOldName = run(fixture, "quick", "", "codex:quick");
+  assert.equal(viaOldName.status, 0, viaOldName.stdout + viaOldName.stderr);
+  assert.match(
+    viaOldName.stderr,
+    /"npm run codex:quick" is the old name; use "npm run verify:quick"/,
+  );
+
+  const viaNewName = run(harnessFixture(t), "quick", "", "verify:quick");
+  assert.equal(viaNewName.status, 0, viaNewName.stdout + viaNewName.stderr);
+  assert.doesNotMatch(viaNewName.stderr, /old name/);
 });
 
 test("quick stops at a failed check instead of reporting success", (t) => {

@@ -3,7 +3,7 @@
 // prisma/migrations の migration.sql を突き合わせる。読み取り専用のトランザクションで
 // `_prisma_migrations` を読むだけで、DB には書き込まない。
 //
-// 使い方: node scripts/check-migration-checksums.mjs（codex:db から呼ばれる）
+// 使い方: node scripts/check-migration-checksums.mjs（verify:db から呼ばれる）
 import process from "node:process";
 import pg from "pg";
 
@@ -64,7 +64,7 @@ const { pendingButApplied, appliedButNotInDb } = compareWithRegistry(records, {
   applied: APPLIED_MIGRATIONS,
   pending: PENDING_MIGRATIONS,
 });
-const allowPendingApplied = process.env.CODEX_DB_ALLOW_PENDING_APPLIED === "1";
+const allowPendingApplied = process.env.VERIFY_DB_ALLOW_PENDING_APPLIED === "1";
 
 for (const name of appliedButNotInDb) {
   console.warn(
@@ -78,7 +78,7 @@ for (const { name, checksum } of pendingButApplied) {
     [
       `[checksum] 未適用（PENDING_MIGRATIONS）に分類されているが、この DB では適用済み: ${name}`,
       `           scripts/lib/migration-registry.mjs の APPLIED_MIGRATIONS へ移すこと（checksum ${checksum}）。`,
-      "           専用の開発 DB で migrate dev した直後なら、CODEX_DB_ALLOW_PENDING_APPLIED=1 で警告に下げられる。",
+      "           専用の開発 DB で migrate dev した直後なら、VERIFY_DB_ALLOW_PENDING_APPLIED=1 で警告に下げられる。",
     ].join("\n"),
   );
 }

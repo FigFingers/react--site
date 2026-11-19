@@ -8,7 +8,7 @@ import {
 } from "../../scripts/lib/migration-registry.mjs";
 
 // 分類と checksum の記録は scripts/lib/migration-registry.mjs にある。
-// 本番の記録との突き合わせは codex:db が行い、ここは DB の無い CI 向けの検査。
+// 本番の記録との突き合わせは verify:db が行い、ここは DB の無い CI 向けの検査。
 const local = localMigrationChecksums("prisma/migrations");
 
 test("already-applied migrations retain their recorded checksums", () => {
@@ -31,7 +31,7 @@ test("every migration is recorded as either applied or pending", () => {
       applied
         ? `${name} が APPLIED と PENDING の両方にある。どちらか一方にすること。`
         : `${name} が scripts/lib/migration-registry.mjs に無い。新しい migration なら ` +
-            `PENDING_MIGRATIONS に足す。本番に適用済みかどうかは codex:db で確かめること。`,
+            `PENDING_MIGRATIONS に足す。本番に適用済みかどうかは verify:db で確かめること。`,
     );
   }
 });

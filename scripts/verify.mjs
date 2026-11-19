@@ -29,12 +29,12 @@ function parseEnvFile(filePath) {
 }
 
 function logStep(label) {
-  console.log(`\n[codex] ${label}`);
+  console.log(`\n[verify] ${label}`);
 }
 
 function runNode(args, options = {}) {
   const printable = ["node", ...args].join(" ");
-  console.log(`[codex] > ${printable}`);
+  console.log(`[verify] > ${printable}`);
   execFileSync(process.execPath, args, {
     stdio: "inherit",
     windowsHide: true,
@@ -91,7 +91,7 @@ function hasSshTunnelConfig(localEnv) {
 function runQuick() {
   logStep("quick: node version");
   assertNodeVersion();
-  console.log(`[codex] Node ${process.versions.node}`);
+  console.log(`[verify] Node ${process.versions.node}`);
 
   logStep("quick: prisma generate");
   runCli("prisma", "prisma", ["generate"], {
@@ -135,7 +135,7 @@ function runDb() {
   logStep("db: env check");
   const localEnv = loadDotEnvLocal();
   ensureDbConfig(localEnv);
-  console.log("[codex] DATABASE_URL is present");
+  console.log("[verify] DATABASE_URL is present");
 
   if (hasSshTunnelConfig(localEnv)) {
     logStep("db: start tunnel");
@@ -143,7 +143,7 @@ function runDb() {
   } else {
     logStep("db: start tunnel");
     console.log(
-      "[codex] DB_SSH_USER/DB_SSH_PORT not set, using direct DB connection",
+      "[verify] DB_SSH_USER/DB_SSH_PORT not set, using direct DB connection",
     );
   }
 
@@ -178,15 +178,24 @@ const runners = {
 
 if (!mode || !(mode in runners)) {
   // biome-ignore lint/security/noSecrets: Static CLI usage text, not a credential.
-  console.error("Usage: node scripts/codex-harness.mjs <quick|schema|db|full>");
+  console.error("Usage: node scripts/verify.mjs <quick|schema|db|full>");
   process.exit(1);
+}
+
+// codex:* is the old name of verify:*, kept so existing habits keep working.
+// The gates were never Codex-specific: CI, people, and every agent run them.
+const npmScript = process.env.npm_lifecycle_event ?? "";
+if (npmScript.startsWith("codex:")) {
+  console.warn(
+    `[verify] "npm run ${npmScript}" is the old name; use "npm run verify:${mode}".`,
+  );
 }
 
 try {
   runners[mode]();
-  console.log(`\n[codex] ${mode} completed`);
+  console.log(`\n[verify] ${mode} completed`);
 } catch (error) {
-  console.error(`\n[codex] ${mode} failed`);
+  console.error(`\n[verify] ${mode} failed`);
   console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 }

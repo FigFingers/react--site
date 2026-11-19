@@ -11,7 +11,7 @@ import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 
 export function createFixture(t) {
   const tempRoot = resolve(tmpdir());
-  const root = mkdtempSync(join(tempRoot, "codex tooling "));
+  const root = mkdtempSync(join(tempRoot, "tooling fixture "));
   t.after(() => {
     const target = relative(tempRoot, resolve(root));
     assert.ok(target && !target.startsWith("..") && !isAbsolute(target));

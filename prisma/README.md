@@ -17,7 +17,7 @@ needed. Otherwise, after approval to remove the obsolete migration records, run:
 
 ```powershell
 node --env-file=.env.local --import tsx scripts/repair-sqlite-migration.mts --apply
-npm.cmd run codex:db
+npm.cmd run verify:db
 ```
 
 The repair removes only rows named `20251031065950_add_playlist_table` from

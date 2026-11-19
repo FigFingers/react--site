@@ -98,25 +98,25 @@ none of it, and neither does a fresh agent session on another machine.
 
 - Use Node.js 24.x and installed dependencies. On Windows PowerShell, use `npm.cmd`
   instead of `npm` if the execution policy blocks `npm.ps1`; no policy change is needed.
-  `node scripts/codex-harness.mjs <quick|schema|db|full>` also works directly.
-- For code changes, run `npm run codex:quick`: regenerate Prisma Client, generate Next.js
+  `node scripts/verify.mjs <quick|schema|db|full>` also works directly.
+- For code changes, run `npm run verify:quick`: regenerate Prisma Client, generate Next.js
   route types, lint, run all `tests/**/*.test.mjs`, and typecheck. Prisma generation needs
   `DATABASE_URL` in `.env.local`, `.env`, or the process environment, but does not connect to DB.
-- For Prisma schema, migrations, or augment changes, also run `npm run codex:schema`:
+- For Prisma schema, migrations, or augment changes, also run `npm run verify:schema`:
   Prisma validation and an augment check that fails if generated SQL is missing.
   This does not replay SQL, check applied-file checksums, or verify the live DB schema.
   Review raw-SQL removal warnings and any hand-written inverse SQL separately.
-- For DB-backed behavior changes, also run `npm run codex:db`: configuration, optional
+- For DB-backed behavior changes, also run `npm run verify:db`: configuration, optional
   SSH tunnel, migration status, and a comparison of `_prisma_migrations` checksums with the
   local `migration.sql` files (read-only). It fails when an applied migration's file differs
   from what was recorded, and when a migration recorded as pending in
   `scripts/lib/migration-registry.mjs` is already applied in that database. It warns about
-  migrations recorded only in the database. Set `CODEX_DB_ALLOW_PENDING_APPLIED=1` only when
+  migrations recorded only in the database. Set `VERIFY_DB_ALLOW_PENDING_APPLIED=1` only when
   the target is a dedicated development database right after `migrate dev`; it turns the
   pending-but-applied failure into a warning and never excuses a checksum mismatch.
   This is a connectivity/history check, not a behavior test.
 - For auth, authorization, extension-token lifecycle, migration SQL/generation, or destructive
-  data behavior changes, run `npm run codex:full` (quick + schema + db + production build).
+  data behavior changes, run `npm run verify:full` (quick + schema + db + production build).
   A successful full run covers the individual gates; do not repeat them without a reason.
 - For documentation-only changes, check the changed instructions, links, and commands;
   application gates are not required unless executable behavior also changed.
@@ -142,7 +142,7 @@ none of it, and neither does a fresh agent session on another machine.
   4. Run `node --import tsx scripts/prisma-augment.ts`
   5. Review `prisma/migrations/<timestamp>_<name>/migration.sql`, add the directory name to
      `PENDING_MIGRATIONS` in `scripts/lib/migration-registry.mjs` (CI fails on an unrecorded
-     migration), then run `npm run codex:schema`
+     migration), then run `npm run verify:schema`
   6. Apply to the dedicated development database with `npx prisma migrate dev`
   7. Regenerate Prisma Client with `npx prisma generate` (Prisma 7 does not do this automatically),
      then run the required validation gates.
@@ -151,10 +151,10 @@ none of it, and neither does a fresh agent session on another machine.
   do not substitute the shared database for development or run a reset to unblock the work.
 - Deployment to shared/staging/production databases uses reviewed, committed migrations with
   `npx prisma migrate deploy` only when that deployment is in the user's authorized scope.
-  Run `npx prisma generate` for the application build and run `npm run codex:db` against the
+  Run `npx prisma generate` for the application build and run `npm run verify:db` against the
   deployed database afterwards. It fails because the new migration is still recorded as pending
   and prints its checksum: move the entry from `PENDING_MIGRATIONS` to `APPLIED_MIGRATIONS` in
-  `scripts/lib/migration-registry.mjs` with that checksum and commit it, so codex:db passes again
+  `scripts/lib/migration-registry.mjs` with that checksum and commit it, so verify:db passes again
   and CI, which has no database, also rejects later edits to that file.
 - If Prisma tries to generate follow-up diff noise around partial indexes, stop and inspect before proceeding.
 - シャドウDB は履歴を空の Postgres へ先頭から再生する。`20260430010000_init`
@@ -163,9 +163,9 @@ none of it, and neither does a fresh agent session on another machine.
 - 適用済みの migration ファイルは編集しない。Prisma 7.4.0 ではチェックサム不一致を
   検出して reset を要求するのは `migrate dev` であり、`migrate status` /
   `migrate deploy` はチェックサムだけの不一致を報告しない。相当の DDL は未適用の
-  migration へ集約する。この不一致は `npm run codex:db` が `_prisma_migrations` と
+  migration へ集約する。この不一致は `npm run verify:db` が `_prisma_migrations` と
   突き合わせて検出する。「未適用のはず」という前提は、コミットメッセージや PR 本文
-  ではなく codex:db の出力で確かめる。
+  ではなく verify:db の出力で確かめる。
 
 ## Delivery Format
 
@@ -174,4 +174,4 @@ none of it, and neither does a fresh agent session on another machine.
   next step, say what it will make visible and to whom, and run it only once the user says to —
   the outward-facing rule in the Git section, restated here so the two do not drift apart.
 - For review tasks, lead with concrete findings, file references, and missing tests.
-- If a task is blocked by DB connectivity, state whether `codex:quick` and `codex:schema` still pass.
+- If a task is blocked by DB connectivity, state whether `verify:quick` and `verify:schema` still pass.

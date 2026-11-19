@@ -129,7 +129,7 @@ DROP INDEX IF EXISTS "favorite_unique_active";
 5. `prisma/migrations/<stamp>_<name>/migration.sql` を確認  
    - 自動生成部分は `GENERATED_*` ブロック
    - 手書きの SQL を混在させたい場合はブロック外に追記
-6. `npm run codex:schema` で未生成SQLがないことを確認
+6. `npm run verify:schema` で未生成SQLがないことを確認
 7. 専用の開発DBで `npx prisma migrate dev` を実行し、`npx prisma generate` でClientを再生成
 8. 必要な検証ゲート・レビューを完了してコミット。共有DB等への適用は別のデプロイ手順で行う
 

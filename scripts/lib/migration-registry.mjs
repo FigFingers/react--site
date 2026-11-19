@@ -2,7 +2,7 @@
 
 /**
  * migration の適用状態の記録。DB の無い CI（tests/db/applied-migrations.test.mjs）と、
- * DB に接続する codex:db（scripts/check-migration-checksums.mjs）の両方がここを見る。
+ * DB に接続する verify:db（scripts/check-migration-checksums.mjs）の両方がここを見る。
  *
  * - APPLIED_MIGRATIONS: 本番に適用済み。値は本番の `_prisma_migrations.checksum`
  *   （= migration.sql の sha256）。CI はこの値とファイルの一致を検査し、適用済み
@@ -11,8 +11,8 @@
  *
  * prisma/migrations の全ディレクトリは、どちらか一方に入っていなければならない
  * （CI が検査する）。新しい migration はまず PENDING に入れ、本番へ適用したら
- * codex:db が表示する checksum とともに APPLIED へ移す。分類を誤ったまま
- * 本番で適用済みになっていれば、codex:db が失敗する（#74 はこの誤分類から起きた）。
+ * verify:db が表示する checksum とともに APPLIED へ移す。分類を誤ったまま
+ * 本番で適用済みになっていれば、verify:db が失敗する（#74 はこの誤分類から起きた）。
  */
 export const APPLIED_MIGRATIONS = {
   "20260430010000_init":

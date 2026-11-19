@@ -115,7 +115,7 @@ test("a migration recorded as pending but applied in the DB is reported with its
   });
 });
 
-test("codex:db fails on pending-but-applied unless explicitly allowed for a dev database", () => {
+test("verify:db fails on pending-but-applied unless explicitly allowed for a dev database", () => {
   const pendingButApplied = [{ name: "002_harden", checksum: "bbb" }];
   const mismatched = [{ name: "001_init", recorded: "aaa", local: "zzz" }];
 

@@ -23,22 +23,24 @@ Next.js App Router application for FigFingers. The current branch uses a Prisma/
 3. Start the app.
    `npm run dev`
 
-## Codex Workflow
+## Validation
 
-Use the Codex harness scripts to keep AI-driven changes inside a repeatable validation flow:
+Run the validation gates in `scripts/verify.mjs` before committing, whether the change was written by hand or by an AI agent. CI runs the same `quick` and `schema` gates.
 
-- `npm run codex:quick`
+- `npm run verify:quick`
   - checks Node 24.x, regenerates Prisma Client and Next.js route types, then runs lint, all tests, and TypeScript
-- `npm run codex:schema`
+- `npm run verify:schema`
   - validates Prisma schema and fails if `prisma-augment` finds SQL that still needs generating; does not replay migrations
-- `npm run codex:db`
+- `npm run verify:db`
   - verifies `.env.local`, starts the SSH tunnel when `DB_SSH_USER` and `DB_SSH_PORT` are set, and runs `prisma migrate status`
-- `npm run codex:full`
+- `npm run verify:full`
   - runs all of the above plus `npm run build`
 
-In Windows PowerShell, use `npm.cmd run codex:quick` if `npm.ps1` is blocked. The harness also runs directly with `node scripts/codex-harness.mjs quick`; it launches installed JavaScript CLIs without npm/npx command shims. Prisma commands need a configured `DATABASE_URL`, but quick/schema validation does not connect to the database.
+In Windows PowerShell, use `npm.cmd run verify:quick` if `npm.ps1` is blocked. The script also runs directly with `node scripts/verify.mjs quick`; it launches installed JavaScript CLIs without npm/npx command shims. Prisma commands need a configured `DATABASE_URL`, but quick/schema validation does not connect to the database.
 
-Repository-specific Codex guidance, Git permissions, and required validation gates live in [AGENTS.md](AGENTS.md). Local commits are allowed; outward-facing Git/PR actions follow its separate permission rules. The `docs/` directory is an untracked local workspace.
+`npm run codex:*` is the old name of these scripts. It still works and prints the new name.
+
+Guidance for AI agents, Git permissions, and the validation gate required for each kind of change live in [AGENTS.md](AGENTS.md). Local commits are allowed; outward-facing Git/PR actions follow its separate permission rules. The `docs/` directory is an untracked local workspace.
 
 ## Database
 

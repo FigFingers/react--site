@@ -105,7 +105,7 @@ function runQuick() {
   runCli("@biomejs/biome", "biome", ["check", "."]);
 
   logStep("quick: tests");
-  runNode(["--test", "tests/**/*.test.mjs"]);
+  runNode(["--import", "tsx", "--test", "tests/**/*.test.mjs"]);
 
   logStep("quick: typecheck");
   runCli("typescript", "tsc", [

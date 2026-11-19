@@ -80,7 +80,7 @@ export async function listCursor(
     where,
     take: limit + 1,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-    include: { vod: true, user: true },
+    include: { vod: true, user: { select: { id: true, name: true } } },
   });
 
   const hasNext = data.length > limit;

@@ -3,13 +3,14 @@ import test from "node:test";
 import { NextRequest } from "next/server";
 import { z } from "zod";
 
-const { createRouteHandlers } = await import("../../src/server/api/handler.ts");
-const { parseJsonBody } = await import("../../src/server/http/validation.ts");
 const site = "https://app.example";
 process.env.AUTH_URL = site;
 // Extension allow-lists must not expand the cookie-authenticated v1 boundary.
+// Set before the imports: cors.ts builds its allow-list when first loaded.
 process.env.CLIP_API_ALLOWED_ORIGINS =
   "https://foreign.example,chrome-extension://*";
+const { createRouteHandlers } = await import("../../src/server/api/handler.ts");
+const { parseJsonBody } = await import("../../src/server/http/validation.ts");
 
 for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
   test(`${method} rejects cross-origin requests before any side effect`, async (t) => {

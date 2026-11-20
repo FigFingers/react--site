@@ -20,7 +20,9 @@ type CorsOptions = {
 // 任意プレフィックス一致は web オリジンでサフィックス混同
 // （https://app.example.com* が https://app.example.com.evil.com に一致）を招くため採用しない。
 // また "*" 単体もワイルドカードとして扱わない（全オリジン開放事故の防止）。
-// 注意: link-token / session など Cookie セッション認証のルートがこのチェックを使うため、
+// 注意: Cookie セッションで認証する link-token / unlink はこのチェックを使わず、
+// v1 と同じくサイト自身のオリジンに限る（src/server/http/csrf.ts）。
+// session（ログイン中かどうかだけを返す GET）と Bearer の拡張用 API はこのチェックを使うので、
 // 本番では具体的な拡張IDの登録を推奨。
 function originMatches(pattern: string, origin: string) {
   if (pattern === origin) return true;

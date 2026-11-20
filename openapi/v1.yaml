@@ -21,7 +21,8 @@ info:
 
     routes themselves.
 
-    v1 writes require the site's own Origin (AUTH_URL / NEXTAUTH_URL when set).
+    v1 writes require the site's own Origin, the origin of AUTH_URL (or of
+    NEXTAUTH_URL when AUTH_URL is unset or blank).
     Cross-site browser writes and opaque origins are rejected with 403.
     Non-browser callers may omit Origin and Sec-Fetch-Site. JSON request bodies
     require Content-Type application/json (parameters such as charset are allowed);

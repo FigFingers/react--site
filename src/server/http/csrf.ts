@@ -1,4 +1,5 @@
 import { ForbiddenError } from "@/server/http/errors";
+import { requireSiteOrigin } from "@/server/http/site-origin";
 
 /** Cookie-authenticated v1 writes are only intended for the site's own origin. */
 export function assertSameOriginWrite(request: Request) {
@@ -6,15 +7,13 @@ export function assertSameOriginWrite(request: Request) {
 
   const origin = request.headers.get("origin");
   const fetchSite = request.headers.get("sec-fetch-site");
-  // AUTH_URL is the public URL when Next.js runs behind a reverse proxy.
-  const siteOrigin = new URL(
-    process.env.AUTH_URL ?? process.env.NEXTAUTH_URL ?? request.url,
-  ).origin;
 
   if (
     fetchSite === "cross-site" ||
-    (origin !== null && origin !== siteOrigin) ||
-    (origin === null && fetchSite !== null && fetchSite !== "same-origin")
+    (origin === null && fetchSite !== null && fetchSite !== "same-origin") ||
+    // Only a request with an Origin needs the configured site origin, so a
+    // missing AUTH_URL / NEXTAUTH_URL surfaces here as a configuration error.
+    (origin !== null && origin !== requireSiteOrigin())
   ) {
     throw new ForbiddenError(
       "Cross-origin write not allowed",

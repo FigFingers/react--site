@@ -1,12 +1,15 @@
+import { configuredSiteOrigin } from "@/server/http/site-origin";
+
 const allowedOriginsEnv = process.env.CLIP_API_ALLOWED_ORIGINS ?? "";
 
 function normalizeOrigins(values: Array<string | undefined>) {
   return values.map((value) => value?.trim()).filter(Boolean) as string[];
 }
 
+// サイト自身のオリジンは v1 の書き込み検査（csrf.ts）と同じ求め方にする。
+// 末尾の "/" やパスが付いた URL でも Origin ヘッダーと一致する。
 const clipWriteAllowedOrigins = normalizeOrigins([
-  process.env.AUTH_URL,
-  process.env.NEXTAUTH_URL,
+  configuredSiteOrigin(),
   ...allowedOriginsEnv.split(","),
 ]);
 
